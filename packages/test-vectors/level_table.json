@@ -1,0 +1,13 @@
+{"_doc": "점수 → 등급 (contracts/db.dbml levels). 양쪽 Rules 테스트가 읽는다.",
+ "cases": [
+  {"score": 0,   "level": "OUTSIDER"},
+  {"score": 19,  "level": "OUTSIDER"},
+  {"score": 20,  "level": "TOURIST"},
+  {"score": 39,  "level": "TOURIST"},
+  {"score": 40,  "level": "SETTLER"},
+  {"score": 60,  "level": "SETTLER"},
+  {"score": 65,  "level": "NATIVE"},
+  {"score": 84,  "level": "NATIVE"},
+  {"score": 85,  "level": "LOCAL"},
+  {"score": 100, "level": "LOCAL"}
+ ]}

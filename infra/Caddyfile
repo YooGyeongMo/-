@@ -1,0 +1,8 @@
+{
+    admin 0.0.0.0:2019
+}
+:80 {
+    encode gzip
+    header X-Request-Id {http.request.uuid}
+    reverse_proxy api_blue:8080
+}

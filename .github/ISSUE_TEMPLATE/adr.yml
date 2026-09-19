@@ -1,0 +1,19 @@
+name: 결정 (ADR)
+description: 트레이드오프가 있는 결정
+title: "[adr] "
+labels: ["type:adr"]
+body:
+  - type: textarea
+    id: context
+    attributes: { label: 맥락 }
+    validations: { required: true }
+  - type: textarea
+    id: options
+    attributes: { label: 선택지 (각 장단점) }
+    validations: { required: true }
+  - type: textarea
+    id: decision
+    attributes: { label: 결정과 근거 }
+  - type: input
+    id: revert
+    attributes: { label: 되돌리는 조건 }

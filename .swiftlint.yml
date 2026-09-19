@@ -1,0 +1,17 @@
+included: [apps/ios-macos]
+excluded: [apps/ios-macos/Derived, apps/ios-macos/**/Generated]
+disabled_rules: [trailing_comma, todo]
+opt_in_rules: [empty_count, explicit_init, first_where, sorted_imports, unowned_variable_capture]
+line_length: { warning: 140, error: 180 }
+custom_rules:
+  presentation_cross_import:
+    name: "Presentation 흐름 간 참조 금지"
+    included: "apps/ios-macos/Modules/Presentation/Sources/.*\\.swift"
+    regex: "\\b(OnboardingFlow|HomeFlow|ProjectFlow|MeetingFlow|TranslateFlow|ReviewFlow|QuizFlow|MyFlow)\\b"
+    message: "흐름 간 직접 참조 금지. Contracts 프로토콜과 Navigation을 통해서만."
+    severity: error
+  no_unowned:
+    name: "unowned 금지"
+    regex: "\\bunowned\\b"
+    message: "weak를 쓴다 (설계 D-15)"
+    severity: error

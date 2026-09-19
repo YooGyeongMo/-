@@ -60,3 +60,24 @@ fastlane/report.xml
 fastlane/Preview.html
 fastlane/screenshots/**/*.png
 fastlane/test_output
+
+# Tuist
+apps/ios-macos/Derived/
+apps/ios-macos/*.xcodeproj
+apps/ios-macos/*.xcworkspace
+apps/ios-macos/.tuist-cache/
+apps/ios-macos/Tuist/.build/
+**/Generated/
+# Python
+__pycache__/
+.venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+# infra
+infra/.env
+infra/**/*.tfstate*
+.terraform/
+# misc
+.DS_Store

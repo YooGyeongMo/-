@@ -1,0 +1,37 @@
+name: mwonmal
+services:
+  caddy:
+    image: caddy:2
+    ports: ["8080:80"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data"]
+    depends_on: [api_blue]
+  api_blue:
+    build: { context: .., dockerfile: services/api/Dockerfile }
+    image: ghcr.io/yoogyeongmo/mwonmal-api:${API_TAG:-local}
+    environment: { MWONMAL_ENV: local }
+    healthcheck: { test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/ready')"], interval: 5s, retries: 10 }
+  api_green:
+    build: { context: .., dockerfile: services/api/Dockerfile }
+    image: ghcr.io/yoogyeongmo/mwonmal-api:${API_TAG:-local}
+    environment: { MWONMAL_ENV: local }
+    profiles: [green]
+  mysql:
+    image: mysql:8.4
+    environment: { MYSQL_ROOT_PASSWORD: local, MYSQL_DATABASE: mwonmal }
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    volumes: ["mysql_data:/var/lib/mysql"]
+    healthcheck: { test: ["CMD", "mysqladmin", "ping", "-plocal"], interval: 5s, retries: 20 }
+  redis:
+    image: redis:7-alpine
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment: { MINIO_ROOT_USER: local, MINIO_ROOT_PASSWORD: localpass }
+    ports: ["9000:9000", "9001:9001"]
+    volumes: ["minio_data:/data"]
+  prism:
+    image: stoplight/prism:5
+    command: mock -h 0.0.0.0 -p 4010 /contracts/openapi.yml
+    ports: ["4010:4010"]
+    volumes: ["../contracts:/contracts:ro"]
+volumes: { caddy_data: {}, mysql_data: {}, minio_data: {} }

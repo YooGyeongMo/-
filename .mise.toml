@@ -1,0 +1,5 @@
+[tools]
+tuist = "4.208.0"
+swiftformat = "0.63.0"
+python = "3.12"
+uv = "latest"
