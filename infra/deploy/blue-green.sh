@@ -2,7 +2,7 @@
 # 블루·그린 배포 (ADR-0003). 사용: API_TAG=sha ./blue-green.sh
 set -euo pipefail
 cd "$(dirname "$0")/.."
-ACTIVE=$(curl -fsS localhost:2019/config/apps/http/servers/srv0/routes/0/handle/0/upstreams/0/dial | tr -d '"' | cut -d: -f1)
+ACTIVE=$(curl -fsS localhost:2019/config/apps/http/servers/srv0/routes/0/handle/0/upstreams/0/dial | tr -d '"' | cut -d: -f1) # gitleaks:allow
 [[ "$ACTIVE" == "api_blue" ]] && NEW=api_green || NEW=api_blue
 echo "active=$ACTIVE new=$NEW tag=${API_TAG:?}"
 docker compose pull "$NEW"

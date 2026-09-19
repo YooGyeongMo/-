@@ -3,8 +3,9 @@
 import PackageDescription
 
 #if TUIST
-import ProjectDescription
-let packageSettings = PackageSettings(productTypes: [:])
+    import ProjectDescription
+
+    let packageSettings = PackageSettings(productTypes: [:])
 #endif
 
 let package = Package(

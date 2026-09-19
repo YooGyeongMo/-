@@ -1,5 +1,5 @@
-import SwiftUI
 import Composition
+import SwiftUI
 
 @main
 struct MwonmalIOSApp: App {

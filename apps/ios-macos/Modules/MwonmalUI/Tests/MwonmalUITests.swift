@@ -1,7 +1,7 @@
-import Testing
 @testable import MwonmalUI
+import Testing
 
-@Suite struct MwonmalUIModuleTests {
+struct MwonmalUIModuleTests {
     @Test func moduleName() {
         #expect(MwonmalUIModule.name == "MwonmalUI")
     }

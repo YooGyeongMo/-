@@ -1,7 +1,7 @@
-import Testing
 @testable import Navigation
+import Testing
 
-@Suite struct NavigationModuleTests {
+struct NavigationModuleTests {
     @Test func moduleName() {
         #expect(NavigationModule.name == "Navigation")
     }

@@ -54,7 +54,7 @@ jobs:
           file: services/api/Dockerfile
           push: ${{ github.event_name == 'push' }}
           tags: ghcr.io/yoogyeongmo/mwonmal-api:${{ github.sha }}
-      - uses: aquasecurity/trivy-action@0.28.0
+      - uses: aquasecurity/trivy-action@master
         if: github.event_name == 'push'
         with:
           image-ref: ghcr.io/yoogyeongmo/mwonmal-api:${{ github.sha }}

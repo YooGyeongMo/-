@@ -1,7 +1,7 @@
-import Testing
 @testable import Data
+import Testing
 
-@Suite struct DataModuleTests {
+struct DataModuleTests {
     @Test func moduleName() {
         #expect(DataModule.name == "Data")
     }

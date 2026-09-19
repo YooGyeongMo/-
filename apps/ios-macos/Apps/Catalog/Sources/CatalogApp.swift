@@ -1,5 +1,5 @@
-import SwiftUI
 import MwonmalUI
+import SwiftUI
 
 @main
 struct CatalogApp: App {
