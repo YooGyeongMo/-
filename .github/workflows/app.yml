@@ -34,4 +34,4 @@ jobs:
           key: tuist-${{ runner.os }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'contracts/openapi.yml') }}
       - run: cd apps/ios-macos && tuist install && tuist generate --no-open
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build
-      - run: cd apps/ios-macos && tuist test --no-open
+      - run: cd apps/ios-macos && tuist test MwonmalMac
