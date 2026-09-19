@@ -18,7 +18,7 @@ jobs:
       - run: swiftlint --strict
       - run: swiftformat --lint .
   build-test:
-    # self-hosted macOS 러너 등록 후 [self-hosted, macOS]로 전환 (ADR-0002). hosted 이미지에 Xcode 26이 없으면 이 job은 실패한다.
+    # hosted macos-15는 호스트 OS가 15라 macOS 26 타깃 테스트를 못 돌린다 → 단위 테스트는 iOS 26 시뮬레이터로. macOS 실행 테스트는 self-hosted(macOS 26) 러너에서 (ADR-0002).
     runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
@@ -34,4 +34,4 @@ jobs:
           key: tuist-${{ runner.os }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'contracts/openapi.yml') }}
       - run: cd apps/ios-macos && tuist install && tuist generate --no-open
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build
-      - run: cd apps/ios-macos && tuist test MwonmalMac
+      - run: cd apps/ios-macos && tuist test MwonmalIOS --no-selective-testing
