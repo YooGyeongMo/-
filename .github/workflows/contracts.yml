@@ -1,0 +1,21 @@
+name: contracts
+on:
+  pull_request: { paths: ["contracts/**"] }
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22 }
+      - run: npx --yes @apidevtools/swagger-cli validate contracts/openapi.yml
+      - run: npx --yes @redocly/cli lint contracts/openapi.yml --skip-rule security-defined
+      - run: npx --yes -p @dbml/cli dbml2sql contracts/db.dbml --mysql -o /tmp/schema.sql && wc -l /tmp/schema.sql
+      - run: "! grep -nE '·|—|판능시' contracts/openapi.yml contracts/db.dbml"
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} }

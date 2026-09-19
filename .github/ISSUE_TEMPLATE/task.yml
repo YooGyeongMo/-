@@ -1,0 +1,31 @@
+name: 작업
+description: 하루 단위 작업 (기능·수정·문서·인프라)
+title: "[S?][area] "
+labels: ["type:feat"]
+body:
+  - type: input
+    id: purpose
+    attributes: { label: 목적 (한 줄) }
+    validations: { required: true }
+  - type: textarea
+    id: scope
+    attributes: { label: 범위, description: 이 이슈에서 하는 것 / 안 하는 것 }
+    validations: { required: true }
+  - type: textarea
+    id: done
+    attributes: { label: 완료 기준, description: 체크박스로. 테스트 포함., value: "- [ ] \n- [ ] 테스트: \n- [ ] 문서/로그" }
+    validations: { required: true }
+  - type: textarea
+    id: tradeoff
+    attributes: { label: 트레이드오프, description: 선택지·결정·ADR 링크. 없으면 "없음"., value: "없음" }
+    validations: { required: true }
+  - type: input
+    id: docs
+    attributes: { label: 관련 문서 (설계 §) }
+  - type: input
+    id: screens
+    attributes: { label: 화면 ID }
+  - type: dropdown
+    id: size
+    attributes: { label: 예상 크기, options: ["S (~2h)", "M (~4h)", "L (하루)"] }
+    validations: { required: true }

@@ -1,0 +1,3044 @@
+openapi: 3.0.3
+info:
+  title: 뭔말인교? API
+  description: |
+    판교어 해석 + 간격 반복 학습 서비스 "뭔말인교?"의 RESTful API 명세서입니다.
+
+    ## 서비스 구조
+    계정 → 프로젝트(코드명 + 설명) → { 회의(= 회의록: 녹음, 해석, 할 일, 모르는 말), 메시지 해석(회의와 무관), 할 일 }
+    모르는 말(카드)은 서비스 전체 단어장이며 프로젝트로 걸러 봅니다. 웹, 앱은 같은 계정, 같은 DB를 씁니다.
+
+    ## 서비스 흐름
+    판교어를 만난다 → (해석) 이해한다 → (카드) 담는다 → (복습) 떠올린다 → (판교어 실력 테스트) 확인한다
+
+    ## 공통 규칙
+    - 날짜/시간 형식: ISO 8601 (예: 2026-09-17T13:30:00)
+    - 날짜 형식: YYYY-MM-DD (예: 2026-09-17)
+    - 페이지네이션: 목록 API는 page(1부터), size 쿼리 파라미터를 지원하며 응답은 PagedResponse 래퍼 구조로 반환합니다.
+    - 모든 에러 응답은 공통 Error 스키마를 사용합니다.
+    - 화면 ID는 UI 흐름도(v5.2)와 대응합니다. 앱: O-1~3, S-01, S-00-1~5, A-01~A-13 / 웹: W-00~W-08, W-02a. 화면이 없는 기능(관리 화면 등)은 범위에서 제외했습니다.
+    - 본 명세는 평가 기준에 따라 Security Schemes 정의를 제외합니다. (401/403 응답은 정의)
+  version: 1.0.0
+  contact:
+    name: SKALA AI 웹 서비스 설계 Mini-project
+
+servers:
+  - url: http://localhost:8080/api
+    description: 로컬 개발 서버
+  - url: https://api.mwonmalingyo.kr/api
+    description: 운영 서버
+
+tags:
+  - name: Auth
+    description: 소셜 로그인, 첫 로그인 시 자동 가입 (S-01 로그인)
+  - name: User
+    description: 내 정보, 학습 통계, 온보딩 (A-01 홈, A-09 MY, S-00-2, S-00-5 온보딩)
+  - name: Translation
+    description: AI 해석, 할 일 (W-01, W-03, A-06, 할 일 모아보기 A-01, W-00, W-08)
+  - name: Term
+    description: 판교어 사전 조회 (해석 결과의 용어 뜻 미리보기)
+  - name: Card
+    description: 모르는 말(학습 카드), 서비스 전체 단어장 + 프로젝트 필터 (W-05, W-00, W-03, A-06)
+  - name: Review
+    description: 간격 반복 복습 (A-03, A-04)
+  - name: Exam
+    description: 판교어 실력 테스트 (A-07, A-08)
+  - name: Level
+    description: 판교 등급 마스터 5단계 (A-09, S-00-5)
+  - name: Recording
+    description: 회의 녹음, 동의 필수, 30일 뒤 음성 삭제 (W-02a, W-02, W-04)
+  - name: Notification
+    description: iOS 푸시 토큰, 알림 설정 (S-00-3, A-02, A-05 iOS 시스템 알림), 웹, 앱은 같은 계정, 같은 DB라 별도 동기화 API 없음
+  - name: Project
+    description: 프로젝트, 웹 W-08, W-00 / 앱 A-13, A-10, A-11 / 온보딩 S-00-4
+  - name: Meeting
+    description: 회의(= 회의록), 프로젝트 안에서 만들고, 그 안에서 녹음, 해석 (W-06, W-07, A-12)
+
+paths:
+  # ==========================================
+  # [Auth] 소셜 로그인 - S-01
+  # ==========================================
+  /auth/oauth/{provider}:
+    parameters:
+      - name: provider
+        in: path
+        required: true
+        description: OAuth 제공자 (S-01 Apple, 카카오, Google)
+        schema:
+          type: string
+          enum: [apple, kakao, google]
+        example: google
+    post:
+      tags: [Auth]
+      summary: 소셜 로그인 (OAuth 2.0 코드 교환)
+      description: |
+        화면 S-01. 제공자 인증 화면에서 받은 authorization code를 보내면
+        서버가 제공자에게 토큰을 교환하고 회원을 조회/생성합니다.
+
+        - 기존 회원이면 로그인, 신규면 가입 후 `isNewUser: true`
+        - `isNewUser`가 true이거나 `onboardedAt`이 null이면 화면은 **S-00-1 온보딩(직군)**으로 보냅니다.
+        - 같은 이메일이 이미 다른 소셜 제공자로 가입돼 있으면 409 EMAIL_ALREADY_REGISTERED
+      operationId: oauthLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OAuthLoginRequest'
+      responses:
+        '200':
+          description: 로그인 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /onboarding:
+    post:
+      tags: [User]
+      summary: 온보딩 완료 (직군 + 레벨 진단)
+      description: |
+        화면 S-00-5(준비 완료)에서 호출. 온보딩에서 모은 값을 한 번에 저장합니다.
+
+        1. S-00-1 직군 선택 → `jobGroup`
+        2. S-00-2 **레벨 진단**, 판교어 10개 중 아는 것 체크 → `knownTermIds`
+        3. 복습 알림 시간 → `reminderHour` (선택. S-00-3에서는 `PATCH /users/me/notification-settings`로 따로 저장)
+
+        S-00-4 첫 프로젝트는 `POST /projects`로 따로 만듭니다.
+
+        서버는 **모르는 용어(체크 안 한 것)를 학습 카드로 자동 생성**합니다.
+        즉 가입 직후부터 복습할 카드가 존재합니다. (빈 화면 방지)
+        완료 시 `users.onboarded_at`이 기록되어 다음 로그인부터는 홈으로 바로 갑니다.
+      operationId: completeOnboarding
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OnboardingRequest'
+      responses:
+        '200':
+          description: 온보딩 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OnboardingResponse'
+              example:
+                user:
+                  userId: 8
+                  nickname: 판교뉴비
+                  jobGroup: 기획
+                  role: MEMBER
+                  currentStreak: 0
+                createdCardCount: 7
+                knownCount: 3
+                estimatedLevel:
+                  code: TOURIST
+                  name: 관광객
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /onboarding/diagnosis-terms:
+    get:
+      tags: [User]
+      summary: 레벨 진단용 용어 목록
+      description: 화면 S-00-2 레벨 진단. 승인된 용어 중 대표 10개를 반환합니다.
+      operationId: getDiagnosisTerms
+      parameters:
+        - name: size
+          in: query
+          required: false
+          description: 진단 용어 수
+          schema:
+            type: integer
+            default: 10
+            minimum: 5
+            maximum: 20
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TermSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # [User] 내 정보 및 학습 통계 - A-01, A-09
+  # ==========================================
+  /users/me:
+    get:
+      tags: [User]
+      summary: 내 정보 조회
+      description: 화면 A-09 MY(닉네임, 등급, 스트릭, 설정).
+      operationId: getMe
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    patch:
+      tags: [User]
+      summary: 내 정보 수정
+      description: 화면 A-10(currentProjectId 저장) 등 내 정보 수정. 닉네임 중복 시 409.
+      operationId: updateMe
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UserUpdateRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /users/me/stats:
+    get:
+      tags: [User]
+      summary: 내 학습 통계 조회
+      description: |
+        화면 A-01 홈, A-09 MY.
+        오늘 복습해야 할 카드 수(dueCount), 스트릭, 기억률 곡선을 반환합니다.
+      operationId: getMyStats
+      parameters:
+        - name: days
+          in: query
+          required: false
+          description: 기억률 곡선 조회 기간(일)
+          schema:
+            type: integer
+            default: 30
+            minimum: 7
+            maximum: 180
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserStatsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /users/me/quizzes:
+    get:
+      tags: [Exam]
+      summary: 내 판교어 실력 테스트 응시 이력
+      description: 지난 판교어 실력 테스트 점수, 등급 이력 (현재 전용 화면 없음).
+      operationId: getMyQuizzes
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResponse'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/QuizSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # [Translation] AI 해석 - W-01, W-03, A-06
+  # ==========================================
+  /translations:
+    post:
+      tags: [Translation]
+      summary: 판교어 해석 실행 (핵심 API)
+      description: |
+        화면 W-01(앱은 A-11, A-12 붙여넣기 시트). 판교어 메시지를 붙여넣으면 한 번의 호출로 네 가지를 반환합니다.
+        `meetingId`를 주면 그 회의록에, 없으면 프로젝트의 「메시지 해석」(회의와 무관한 슬랙, 메일, 캡처)으로 저장합니다.
+
+        1. **쉬운 말 해석** (resultText)
+        2. **할 일 추출** (actionItems), 내가 해야 할 일 + 기한 힌트
+        3. **뉘앙스 해석** (intentType, nuance), 완곡 표현의 실제 의도와 대응 팁
+        4. **모르는 용어** (detectedTerms), 카드 담기 대상
+
+        - jargonCount가 0이면 화면은 "이 문장은 이미 청정 한국어입니다 🌿" 빈 상태를 보여줍니다.
+        - detectedTerms의 startIndex/endIndex로 원문에 형광펜 하이라이트를 그립니다.
+        - 사전에 없는 신규 판교어는 termId가 null이며 AI 해석만 제공합니다.
+        - actionItems가 비어 있으면 화면의 🎯 블록을 숨깁니다 (단순 공유 메시지).
+        - 비로그인 사용자는 1일 3회까지만 허용되며 초과 시 429, AI 엔진 장애 시 503입니다.
+      operationId: createTranslation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TranslationRequest'
+      responses:
+        '201':
+          description: 해석 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranslationResponse'
+              examples:
+                업무지시해독:
+                  summary: 할 일 2개와 뉘앙스를 함께 해석한 경우 (대표 시나리오)
+                  value:
+                    translationId: 1024
+                    projectId: 7
+                    projectName: 루나
+                    meetingId: 12
+                    meetingTitle: 스프린트 계획 회의
+                    sourceType: MESSAGE
+                    inputSource: TYPED
+                    direction: JARGON_TO_PLAIN
+                    sourceText: 이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요
+                    resultText: 이번 작업 범위에서 빼고 다음으로 미루죠. 그 전에 누가 뭘 할지 정리해서 합의해 주세요.
+                    jargonCount: 4
+                    intentType: DECISION
+                    nuance:
+                      note: '"밀죠"는 제안형이지만 실제로는 이미 결정된 내용을 통보하는 표현입니다.'
+                      tip: 되묻기보다 일정만 확인하는 편이 안전합니다.
+                      confidence: 0.88
+                    actionItems:
+                      - actionId: 5001
+                        sortOrder: 1
+                        actionText: 담당자별 역할 정리 문서 만들기
+                        dueHint: 다음 스프린트 시작 전
+                        dueAt: '2026-09-16T17:30:00'
+                        isChecked: false
+                        alertEnabled: true
+                        checkedAt: null
+                      - actionId: 5002
+                        sortOrder: 2
+                        actionText: 관련 팀과 합의 (회의 또는 슬랙)
+                        dueHint: 다음 스프린트 시작 전
+                        dueAt: '2026-09-17T11:00:00'
+                        isChecked: false
+                        alertEnabled: true
+                        checkedAt: null
+                    aiModel: claude-opus-5
+                    latencyMs: 1240
+                    detectedTerms:
+                      - termId: 21
+                        termKo: 스코프 아웃
+                        plainKo: 작업 범위에서 제외
+                        matchedText: 스코프 아웃
+                        startIndex: 8
+                        endIndex: 14
+                        confidence: 0.981
+                        inMyCards: false
+                      - termId: 25
+                        termKo: 넥스트
+                        plainKo: 다음 차례, 다음 일정
+                        matchedText: 넥스트
+                        startIndex: 17
+                        endIndex: 20
+                        confidence: 0.977
+                        inMyCards: false
+                      - termId: 18
+                        termKo: R&R
+                        plainKo: 역할과 책임
+                        matchedText: R&R
+                        startIndex: 31
+                        endIndex: 34
+                        confidence: 0.965
+                        inMyCards: false
+                      - termId: 3
+                        termKo: 얼라인
+                        plainKo: 방향 맞추기
+                        matchedText: 얼라인
+                        startIndex: 40
+                        endIndex: 43
+                        confidence: 0.972
+                        inMyCards: true
+                    createdAt: '2026-09-16T10:22:31'
+                완곡한거절:
+                  summary: 할 일은 없고 뉘앙스만 중요한 경우
+                  value:
+                    translationId: 1026
+                    direction: JARGON_TO_PLAIN
+                    sourceText: 그건 좀 챌린지가 있을 것 같은데요. 일단 팔로업할게요
+                    resultText: 그건 좀 어려울 것 같습니다. 일단 나중에 챙겨 보겠습니다.
+                    jargonCount: 2
+                    intentType: DECLINE
+                    nuance:
+                      note: 완곡한 거절입니다. "일단 팔로업할게요"는 지금은 하지 않겠다는 뜻으로 쓰이는 경우가 많습니다.
+                      tip: 기한을 정해 다시 확인하거나, 대안을 제시하는 편이 좋습니다.
+                      confidence: 0.87
+                    actionItems: []
+                    aiModel: claude-opus-5
+                    latencyMs: 910
+                    detectedTerms:
+                      - termId: 33
+                        termKo: 챌린지
+                        plainKo: 어려움
+                        matchedText: 챌린지
+                        startIndex: 5
+                        endIndex: 8
+                        confidence: 0.94
+                        inMyCards: false
+                      - termId: 7
+                        termKo: 팔로업
+                        plainKo: 이어서 챙기기
+                        matchedText: 팔로업
+                        startIndex: 24
+                        endIndex: 27
+                        confidence: 0.958
+                        inMyCards: false
+                    createdAt: '2026-09-16T11:02:10'
+                청정한국어:
+                  summary: 판교어가 없는 경우
+                  value:
+                    translationId: 1025
+                    direction: JARGON_TO_PLAIN
+                    sourceText: 오늘 점심 뭐 드실래요
+                    resultText: 오늘 점심 뭐 드실래요
+                    jargonCount: 0
+                    intentType: QUESTION
+                    nuance: null
+                    actionItems: []
+                    aiModel: claude-opus-5
+                    latencyMs: 410
+                    detectedTerms: []
+                    createdAt: '2026-09-16T10:25:02'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    get:
+      tags: [Translation]
+      summary: 내 해석 기록 목록
+      description: 화면 W-00 「메시지 해석」 목록(projectId + meetingId=none).
+      operationId: getTranslations
+      parameters:
+        - name: meetingId
+          in: query
+          required: false
+          description: 회의별 해석 목록. 'none'이면 회의 밖 해석만 (W-00 "회의 밖에서 해석한 말")
+          schema:
+            type: string
+            example: none
+        - name: projectId
+          in: query
+          required: false
+          description: 프로젝트별 해석 목록 (W-00, W-01)
+          schema:
+            type: integer
+            format: int64
+        - name: direction
+          in: query
+          required: false
+          description: 해석 방향 필터
+          schema:
+            $ref: '#/components/schemas/TranslationDirection'
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResponse'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/TranslationSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /translations/{translationId}:
+    parameters:
+      - $ref: '#/components/parameters/TranslationIdParam'
+    get:
+      tags: [Translation]
+      summary: 해석 기록 단건 조회
+      operationId: getTranslation
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TranslationResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Translation]
+      summary: 해석 기록 삭제
+      description: 해석 기록 삭제 (현재 시안에 버튼 없음). 원문에 사내 정보가 포함될 수 있어 사용자가 직접 삭제합니다.
+      operationId: deleteTranslation
+      responses:
+        '204':
+          description: 삭제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /uploads/ocr:
+    post:
+      tags: [Translation]
+      summary: 스크린샷에서 글자 추출 (OCR)
+      description: |
+        화면 W-01 캡처 입력. 슬랙, 메일 화면 캡처를 업로드하면 글자를 추출해 돌려줍니다.
+        사용자가 추출된 글자를 확인, 수정한 뒤 `POST /translations`로 해석을 실행합니다.
+
+        - 지원 형식: PNG, JPG (최대 5MB)
+        - `confidence`가 0.7 미만이면 화면에 "글자를 확인해 주세요" 경고를 띄웁니다.
+        - 글자를 하나도 못 찾으면 422 NO_TEXT_DETECTED
+      operationId: extractTextFromImage
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: 캡처 이미지 파일
+      responses:
+        '200':
+          description: 추출 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OcrResponse'
+              example:
+                extractedText: 이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요
+                imageUrl: https://cdn.mwonmalingyo.kr/uploads/2026/09/16/abc123.png
+                confidence: 0.94
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /translations/{translationId}/actions/{actionId}:
+    parameters:
+      - $ref: '#/components/parameters/TranslationIdParam'
+      - name: actionId
+        in: path
+        required: true
+        description: 할 일 ID
+        schema:
+          type: integer
+          format: int64
+        example: 5001
+    patch:
+      tags: [Translation]
+      summary: 할 일 완료 체크
+      description: 화면 W-03, A-06 해석 결과. 완료 체크(isChecked)와 마감 알림(alertEnabled)을 바꿉니다. 체크 시 홈(A-01)의 미완료 개수가 줄어듭니다.
+      operationId: updateAction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActionUpdateRequest'
+      responses:
+        '200':
+          description: 변경 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionItem'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /actions:
+    get:
+      tags: [Translation]
+      summary: 내 할 일 모아보기
+      description: 화면 A-01 홈, W-08 프로젝트 목록, W-00 프로젝트 개요. 해석 결과에서 추출된 할 일을 프로젝트, 회의별로 모아 봅니다.
+      operationId: getActions
+      parameters:
+        - name: meetingId
+          in: query
+          required: false
+          description: 회의별 할 일 (W-07, A-12)
+          schema:
+            type: integer
+            format: int64
+        - name: projectId
+          in: query
+          required: false
+          description: 없으면 모든 프로젝트의 할 일
+          schema:
+            type: integer
+            format: int64
+        - name: checked
+          in: query
+          required: false
+          description: false면 아직 안 끝낸 할 일만 조회
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResponse'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ActionWithSource'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # [Project] 프로젝트, W-08, W-00, A-13, A-10, A-11, S-00-4
+  # ==========================================
+  /projects:
+    get:
+      tags: [Project]
+      summary: 내 프로젝트 목록
+      description: 웹 W-08 프로젝트 목록 / 앱 A-13 프로젝트 목록, A-10 프로젝트 시트. 웹과 앱이 같은 목록을 봅니다.
+      operationId: getProjects
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResponse'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Project]
+      summary: 프로젝트 만들기
+      description: 온보딩 S-00-4, 앱 A-10, 웹 W-08 "새 프로젝트". 같은 이름이 이미 있으면 409.
+      operationId: createProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '201':
+          description: 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /projects/{projectId}:
+    parameters:
+      - $ref: '#/components/parameters/ProjectIdParam'
+    get:
+      tags: [Project]
+      summary: 프로젝트 개요
+      description: 웹 W-00, 앱 A-11 머리. 회의, 해석, 할 일, 모르는 말 개수 포함.
+      operationId: getProject
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Project]
+      summary: 프로젝트 이름, 색 변경
+      operationId: updateProject
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectRequest'
+      responses:
+        '200':
+          description: 수정 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Project]
+      summary: 프로젝트 삭제
+      description: 안의 회의록은 기본 프로젝트("내 프로젝트")로 옮겨집니다.
+      operationId: deleteProject
+      responses:
+        '204':
+          description: 삭제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /projects/{projectId}/meetings:
+    parameters:
+      - $ref: '#/components/parameters/ProjectIdParam'
+    get:
+      tags: [Meeting]
+      summary: 프로젝트의 회의 목록
+      description: 웹 W-00 회의 표, 앱 A-11. 최신 일시 순.
+      operationId: getMeetings
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResponse'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MeetingSummary'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    post:
+      tags: [Meeting]
+      summary: 새 회의 만들기
+      description: 웹 W-06, 앱 A-11 "새 회의". 만든 뒤 회의 안에서 녹음하거나 해석을 추가합니다.
+      operationId: createMeeting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingRequest'
+      responses:
+        '201':
+          description: 생성 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /meetings/{meetingId}:
+    parameters:
+      - $ref: '#/components/parameters/MeetingIdParam'
+    get:
+      tags: [Meeting]
+      summary: 회의 상세 (= 회의록)
+      description: 웹 W-07, 앱 A-12. 녹음, 받아쓰기, 이 회의에서 해석한 말, 할 일, 모르는 말을 한 번에 돌려줍니다.
+      operationId: getMeeting
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingDetail'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      tags: [Meeting]
+      summary: 회의 정보 수정
+      operationId: updateMeeting
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MeetingRequest'
+      responses:
+        '200':
+          description: 수정 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeetingSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Meeting]
+      summary: 회의 삭제
+      description: 녹음 파일도 함께 지웁니다. 담아 둔 복습 카드는 남습니다.
+      operationId: deleteMeeting
+      responses:
+        '204':
+          description: 삭제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # [Recording] 회의 녹음 - W-02a, W-02, W-04
+  # ==========================================
+  /meetings/{meetingId}/recordings:
+    parameters:
+      - $ref: '#/components/parameters/MeetingIdParam'
+    post:
+      tags: [Recording]
+      summary: 회의 녹음 업로드 (텍스트 변환 → 해석)
+      description: |
+        웹 W-02a(동의), W-02(녹음 중), 앱 A-12(같은 동의 시트). 회의 안에서 녹음한 음성을 **1분 단위 조각**으로 올립니다.
+        - 첫 조각: `recordingId` 없이 보냄 → 녹음 생성(status RECORDING), 202로 recordingId 반환
+        - 다음 조각: `recordingId`를 함께 보냄 → 받아쓰기(transcript)가 부분 갱신되어 W-02 "실시간 받아쓰기", W-04 미리보기에 보임
+        - 마지막 조각: `final=true` → 전체 받아쓰기 확정 후 해석(판교어 찾기, 할 일 정리) 시작
+        - 음성 파일은 30일 뒤 자동 삭제(expiresAt)
+        - `consentConfirmed`가 true가 아니면 400 RECORDING_CONSENT_REQUIRED (참석자 녹음 고지 필수)
+        - 처리는 비동기, 202로 recordingId를 돌려주고, 완료되면 DECODE_DONE 푸시를 보냅니다. 결과는 같은 계정이면 웹, 앱 어디서나 조회됩니다.
+        - 최대 60분 / 200MB
+      operationId: uploadRecording
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [audio, consentConfirmed, durationSec]
+              properties:
+                audio:
+                  type: string
+                  format: binary
+                  description: 1분 단위 음성 조각
+                recordingId:
+                  type: integer
+                  format: int64
+                  nullable: true
+                  description: 이어 올릴 녹음 ID (첫 조각이면 비움)
+                  example: 301
+                final:
+                  type: boolean
+                  default: false
+                  description: 마지막 조각이면 true → 해석 시작
+                durationSec:
+                  type: integer
+                  minimum: 1
+                  maximum: 3600
+                  example: 1860
+                consentConfirmed:
+                  type: boolean
+                  description: 참석자에게 녹음 사실을 알렸는지
+                  example: true
+      responses:
+        '202':
+          description: 접수됨 (변환 진행 중)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+
+  /recordings/{recordingId}:
+    parameters:
+      - name: recordingId
+        in: path
+        required: true
+        description: 녹음 ID
+        schema:
+          type: integer
+          format: int64
+        example: 301
+    get:
+      tags: [Recording]
+      summary: 녹음 변환 상태 조회
+      description: 웹 W-02, W-04 진행 표시(3초 폴링). status가 DONE이면 translationId로 해석 결과(W-03, 앱 A-06)를 엽니다.
+      operationId: getRecording
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Recording]
+      summary: 녹음 파일 즉시 삭제
+      description: 음성 파일만 삭제하고 변환된 회의록, 해석 결과는 남깁니다. (현재 시안에 버튼 없음)
+      operationId: deleteRecording
+      responses:
+        '204':
+          description: 삭제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # [Notification] iOS 푸시 토큰, 알림 설정 (웹, 앱은 같은 DB)
+  # ==========================================
+  /devices:
+    post:
+      tags: [Notification]
+      summary: 푸시 토큰 등록
+      description: 앱 알림 허용 직후(S-00-3) iOS APNs 토큰을 등록합니다. 같은 push_token이면 갱신합니다. 기기 간 연결, 페어링 용도가 아닙니다.
+      operationId: registerDevice
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeviceRequest'
+      responses:
+        '201':
+          description: 등록 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeviceResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /devices/{deviceId}:
+    parameters:
+      - name: deviceId
+        in: path
+        required: true
+        description: 푸시 기기 ID
+        schema:
+          type: integer
+          format: int64
+        example: 41
+    delete:
+      tags: [Notification]
+      summary: 기기 해제 (로그아웃)
+      operationId: deleteDevice
+      responses:
+        '204':
+          description: 해제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /users/me/notification-settings:
+    patch:
+      tags: [Notification]
+      summary: 알림 설정 변경
+      description: 온보딩 S-00-3 알림 설정. 퇴근길 복습 시각, 할 일 마감 알림 on/off.
+      operationId: updateNotificationSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationSettings'
+      responses:
+        '200':
+          description: 변경 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/NotificationSettings'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ==========================================
+  # [Term] 판교어 사전 조회 - 해석 결과의 용어 뜻 미리보기
+  # ==========================================
+  /terms/{termId}:
+    parameters:
+      - $ref: '#/components/parameters/TermIdParam'
+    get:
+      tags: [Term]
+      summary: 용어 상세 조회
+      description: 해석 결과에서 용어 칩을 누르면 뜻을 미리 보여줍니다. 예문, 내 카드 학습 상태를 함께 반환합니다.
+      operationId: getTerm
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TermDetail'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # [Card] 모르는 말(학습 카드) - W-05, W-00, W-03, A-06
+  # ==========================================
+  /cards:
+    get:
+      tags: [Card]
+      summary: 내 학습 카드 목록
+      description: 화면 W-05 모르는 말(전체 단어장), W-00 프로젝트 개요. projectId(cards.source_translation_id 기준), status, due 필터를 지원합니다.
+      operationId: getCards
+      parameters:
+        - name: projectId
+          in: query
+          required: false
+          description: 이 프로젝트에서 나온 모르는 말만 (W-05 프로젝트 칩, W-00)
+          schema:
+            type: integer
+            format: int64
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/CardStatus'
+        - name: due
+          in: query
+          required: false
+          description: true면 오늘까지 복습 예정인 카드만 조회
+          schema:
+            type: boolean
+            default: false
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/PagedResponse'
+                  - type: object
+                    properties:
+                      content:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/CardResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      tags: [Card]
+      summary: 카드 담기
+      description: |
+        화면 W-03 해석 결과의 용어 칩.
+        생성 시 due_date는 오늘, interval_days는 0, ease_factor는 2.50으로 시작합니다.
+        이미 담은 용어면 409.
+      operationId: createCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardCreateRequest'
+      responses:
+        '201':
+          description: 담기 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /cards/bulk:
+    post:
+      tags: [Card]
+      summary: 카드 일괄 담기
+      description: 화면 A-06 해석 결과의 모르는 말 한 번에 담기. 이미 담긴 용어는 건너뜁니다.
+      operationId: createCardsBulk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardBulkCreateRequest'
+      responses:
+        '201':
+          description: 담기 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardBulkCreateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /cards/{cardId}:
+    parameters:
+      - $ref: '#/components/parameters/CardIdParam'
+    patch:
+      tags: [Card]
+      summary: 카드 메모, 상태 수정
+      description: 화면 W-05. 메모 수정 또는 복습 일시중지(PAUSED).
+      operationId: updateCard
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CardUpdateRequest'
+      responses:
+        '200':
+          description: 수정 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CardResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags: [Card]
+      summary: 카드 빼기
+      description: 카드 빼기 (현재 시안에 버튼 없음). 카드와 복습 이력이 함께 삭제됩니다.
+      operationId: deleteCard
+      responses:
+        '204':
+          description: 삭제 완료
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # [Review] 간격 반복 복습 - A-03, A-04
+  # ==========================================
+  /reviews/sessions:
+    post:
+      tags: [Review]
+      summary: 복습 세션 시작
+      description: |
+        화면 A-01 [지금 복습하기], A-02/A-05 알림 → A-03.
+        오늘 기준 due_date가 지난 카드를 모아 세션을 만들고 카드 목록을 반환합니다.
+        복습할 카드가 없으면 422 NO_DUE_CARDS.
+      operationId: startReviewSession
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewStartRequest'
+      responses:
+        '201':
+          description: 세션 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+
+  /reviews/sessions/{sessionId}:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    get:
+      tags: [Review]
+      summary: 복습 세션 결과 조회
+      description: 복습 세션 결과 (현재 전용 완료 화면 없음). 완료 수, 정확도, 스트릭, 다음 복습 예정을 반환합니다.
+      operationId: getReviewSession
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewResultResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reviews/sessions/{sessionId}/answers:
+    parameters:
+      - $ref: '#/components/parameters/SessionIdParam'
+    post:
+      tags: [Review]
+      summary: 카드 자가평가 제출
+      description: |
+        화면 A-04. 카드 한 장의 자가평가(다시/애매/좋음/완벽)를 제출하면
+        서버가 SM-2 방식으로 다음 복습 간격을 계산해 반환합니다.
+
+        - AGAIN: interval 1일로 초기화, ease -0.20 (최소 1.30), lapse +1
+        - HARD : interval x 1.2, ease -0.15
+        - GOOD : 1회차 1일 → 2회차 3일 → 이후 interval x ease
+        - EASY : interval x ease x 1.3, ease +0.15 (최대 2.50)
+        - interval이 21일 이상이면 카드 상태가 MASTERED로 전환됩니다.
+      operationId: submitReviewAnswer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReviewAnswerRequest'
+      responses:
+        '200':
+          description: 평가 반영 및 다음 간격 계산 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReviewAnswerResponse'
+              examples:
+                좋음평가:
+                  summary: GOOD 평가로 간격이 3일로 늘어난 경우
+                  value:
+                    cardId: 88
+                    rating: GOOD
+                    prevIntervalDays: 1
+                    nextIntervalDays: 3
+                    nextDueDate: '2026-09-19'
+                    easeFactor: 2.5
+                    repetitionCount: 2
+                    cardStatus: LEARNING
+                    remainingCount: 9
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ==========================================
+  # [Exam] 판교어 실력 테스트 - A-07, A-08
+  # ==========================================
+  /quizzes:
+    post:
+      tags: [Exam]
+      summary: 판교어 실력 테스트 시작 (문항 생성)
+      description: |
+        화면 A-07. 내 카드와 직군 용어 등 승인된 용어에서 뽑아 문항을 생성합니다.
+        오답 보기는 AI가 생성하며, 출제 가능한 용어가 부족하면 422 NOT_ENOUGH_TERMS.
+      operationId: startQuiz
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizStartRequest'
+      responses:
+        '201':
+          description: 실력 테스트 생성 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+
+  /quizzes/{quizId}:
+    parameters:
+      - $ref: '#/components/parameters/QuizIdParam'
+    get:
+      tags: [Exam]
+      summary: 판교어 실력 테스트 결과 조회
+      description: 지난 판교어 실력 테스트 결과 다시 보기 (현재 전용 화면 없음). 점수, 등급, 문항별 채점 결과를 반환합니다.
+      operationId: getQuizResult
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResultResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /quizzes/{quizId}/submit:
+    parameters:
+      - $ref: '#/components/parameters/QuizIdParam'
+    post:
+      tags: [Exam]
+      summary: 판교어 실력 테스트 답안 제출 및 채점
+      description: |
+        화면 A-07 → A-08. 문항 답안을 한 번에 제출합니다.
+        채점 후 점수 구간에 맞는 등급을 부여하고, 최고 점수면 사용자 등급을 갱신합니다.
+        이미 제출된 테스트는 409.
+      operationId: submitQuiz
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuizSubmitRequest'
+      responses:
+        '200':
+          description: 채점 완료
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuizResultResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ==========================================
+  # [Level] 등급 마스터
+  # ==========================================
+  /levels:
+    get:
+      tags: [Level]
+      summary: 등급 목록 조회
+      description: 화면 A-09 등급 목록(S-00-5 사다리). 외지인(OUTSIDER) → 관광객(TOURIST) → 이주민(SETTLER) → 원주민(NATIVE) → 토박이(LOCAL).
+      operationId: getLevels
+      responses:
+        '200':
+          description: 조회 성공
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Level'
+
+# ==========================================
+components:
+  # ------------------------------------------
+  # 공통 파라미터
+  # ------------------------------------------
+  parameters:
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: 페이지 번호 (1부터 시작)
+      schema:
+        type: integer
+        default: 1
+        minimum: 1
+    SizeParam:
+      name: size
+      in: query
+      required: false
+      description: 페이지당 항목 수
+      schema:
+        type: integer
+        default: 10
+        minimum: 1
+        maximum: 100
+    TermIdParam:
+      name: termId
+      in: path
+      required: true
+      description: 용어 ID
+      schema:
+        type: integer
+        format: int64
+      example: 3
+    CardIdParam:
+      name: cardId
+      in: path
+      required: true
+      description: 학습 카드 ID
+      schema:
+        type: integer
+        format: int64
+      example: 88
+    ProjectIdParam:
+      name: projectId
+      in: path
+      required: true
+      description: 프로젝트 ID
+      schema:
+        type: integer
+        format: int64
+      example: 7
+    MeetingIdParam:
+      name: meetingId
+      in: path
+      required: true
+      description: 회의(회의록) ID
+      schema:
+        type: integer
+        format: int64
+      example: 12
+    TranslationIdParam:
+      name: translationId
+      in: path
+      required: true
+      description: 해석 기록 ID
+      schema:
+        type: integer
+        format: int64
+      example: 1024
+    SessionIdParam:
+      name: sessionId
+      in: path
+      required: true
+      description: 복습 세션 ID
+      schema:
+        type: integer
+        format: int64
+      example: 501
+    QuizIdParam:
+      name: quizId
+      in: path
+      required: true
+      description: 판교어 실력 테스트 세션 ID
+      schema:
+        type: integer
+        format: int64
+      example: 77
+
+  # ------------------------------------------
+  # 공통 응답 (예외처리)
+  # ------------------------------------------
+  responses:
+    BadRequest:
+      description: 잘못된 요청 (필수 파라미터 누락, 길이 초과, 유효성 검증 실패)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: INVALID_INPUT
+            message: 문장은 1자 이상 500자 이하로 입력해 주세요.
+            field: sourceText
+            timestamp: '2026-09-16T10:20:00'
+    Unauthorized:
+      description: 인증 실패 (로그인 필요, 토큰 없음/만료)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: UNAUTHORIZED
+            message: 로그인이 필요한 기능이에요.
+            timestamp: '2026-09-16T10:20:00'
+    Forbidden:
+      description: 권한 없음 (인증은 되었으나 접근 권한 없음)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FORBIDDEN
+            message: 내 것이 아니라서 접근할 수 없어요.
+            timestamp: '2026-09-16T10:20:00'
+    NotFound:
+      description: 요청한 리소스를 찾을 수 없음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: TERM_NOT_FOUND
+            message: 사라진 판교어입니다.
+            timestamp: '2026-09-16T10:20:00'
+    Conflict:
+      description: 중복 등 상태 충돌
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: CARD_DUPLICATED
+            message: 이미 담은 카드예요.
+            timestamp: '2026-09-16T10:20:00'
+    UnprocessableEntity:
+      description: 요청은 유효하나 처리 조건을 만족하지 않음
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: NO_DUE_CARDS
+            message: 오늘 복습할 카드가 없어요. 내일 또 만나요!
+            timestamp: '2026-09-16T10:20:00'
+    TooManyRequests:
+      description: 비로그인 체험 횟수 초과
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: GUEST_QUOTA_EXCEEDED
+            message: 오늘 체험 3회를 다 썼어요. 가입하면 계속 쓸 수 있어요.
+            timestamp: '2026-09-16T10:20:00'
+    PayloadTooLarge:
+      description: 업로드 파일 용량 초과 (이미지 5MB, 녹음 200MB)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: FILE_TOO_LARGE
+            message: 이미지는 5MB까지 올릴 수 있어요.
+            timestamp: '2026-09-16T10:20:00'
+    ServiceUnavailable:
+      description: AI 엔진 장애 또는 타임아웃
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          example:
+            code: AI_UNAVAILABLE
+            message: 해석 엔진이 잠깐 멍때리는 중이에요. 다시 시도해 주세요.
+            timestamp: '2026-09-16T10:20:00'
+
+  # ------------------------------------------
+  # 스키마
+  # ------------------------------------------
+  schemas:
+    # ---------- 시스템 전역 공통 스키마 ----------
+    Error:
+      type: object
+      required: [code, message, timestamp]
+      properties:
+        code:
+          type: string
+          description: |
+            에러 코드
+            - 400: INVALID_INPUT, RECORDING_CONSENT_REQUIRED
+            - 401: UNAUTHORIZED, OAUTH_CODE_INVALID
+            - 403: FORBIDDEN, NOT_OWNER
+            - 404: USER_NOT_FOUND, PROJECT_NOT_FOUND, MEETING_NOT_FOUND, TRANSLATION_NOT_FOUND, ACTION_NOT_FOUND, RECORDING_NOT_FOUND, TERM_NOT_FOUND, CARD_NOT_FOUND, SESSION_NOT_FOUND, QUIZ_NOT_FOUND, DEVICE_NOT_FOUND
+            - 409: EMAIL_ALREADY_REGISTERED, NICKNAME_DUPLICATED, PROJECT_NAME_DUPLICATED, ALREADY_ONBOARDED, CARD_DUPLICATED, QUIZ_ALREADY_SUBMITTED
+            - 413: FILE_TOO_LARGE
+            - 422: NO_TEXT_DETECTED, NO_DUE_CARDS, NOT_ENOUGH_TERMS
+            - 429: GUEST_QUOTA_EXCEEDED
+            - 503: AI_UNAVAILABLE
+          example: INVALID_INPUT
+        message:
+          type: string
+          description: 사용자에게 노출할 메시지
+          example: 문장을 입력해 주세요.
+        field:
+          type: string
+          description: 문제가 된 필드명
+          example: sourceText
+        timestamp:
+          type: string
+          format: date-time
+          example: '2026-09-16T10:20:00'
+
+    PagedResponse:
+      type: object
+      description: 목록 API 공통 래퍼
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: {}
+          description: 항목 배열 (각 API에서 구체 타입으로 확장)
+        page:
+          type: integer
+          example: 1
+        size:
+          type: integer
+          example: 10
+        totalElements:
+          type: integer
+          example: 137
+        totalPages:
+          type: integer
+          example: 14
+
+    RecordingResponse:
+      type: object
+      properties:
+        recordingId:
+          type: integer
+          format: int64
+          example: 301
+        meetingId:
+          type: integer
+          format: int64
+          example: 12
+        meetingTitle:
+          type: string
+          description: 녹음이 속한 회의 제목 (meetings.title)
+          example: 스프린트 계획 회의
+        durationSec:
+          type: integer
+          example: 1860
+        transcript:
+          type: string
+          nullable: true
+          description: 받아쓴 내용, 녹음, 변환 중에는 지금까지의 부분 텍스트
+          example: "[10:52 김 PM] 이번 스프린트 스코프 아웃하고 넥스트로 밀죠."
+        status:
+          $ref: '#/components/schemas/RecordingStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+          description: 변환 진행률 0~100 (meeting_recordings.progress)
+          example: 62
+        translationId:
+          type: integer
+          format: int64
+          nullable: true
+          description: DONE일 때 해석 결과 ID
+        failureReason:
+          type: string
+          nullable: true
+          description: FAILED일 때 원인 (meeting_recordings.failure_reason)
+          example: null
+        expiresAt:
+          type: string
+          format: date-time
+          description: 음성 파일 자동 삭제 시점
+
+    DeviceRequest:
+      type: object
+      required: [platform]
+      properties:
+        platform:
+          $ref: '#/components/schemas/DevicePlatform'
+        pushToken:
+          type: string
+          nullable: true
+          description: IOS일 때 APNs 토큰
+          example: 8f1c2a...e9
+
+    DeviceResponse:
+      type: object
+      properties:
+        deviceId:
+          type: integer
+          format: int64
+        platform:
+          $ref: '#/components/schemas/DevicePlatform'
+        lastSeenAt:
+          type: string
+          format: date-time
+
+    NotificationSettings:
+      type: object
+      description: 요청 시 부분 수정(하나 이상), 응답 시 전체 값
+      minProperties: 1
+      properties:
+        reminderHour:
+          type: integer
+          minimum: 0
+          maximum: 23
+          example: 18
+        actionAlertEnabled:
+          type: boolean
+          example: true
+
+    # ---------- Enum ----------
+    TermCategory:
+      type: string
+      enum: [WORK, DATA, DEV, ORG, MEETING, ETC]
+    TranslationDirection:
+      type: string
+      enum: [JARGON_TO_PLAIN, PLAIN_TO_JARGON]
+    InputSource:
+      type: string
+      description: TYPED(직접 입력) / SCREENSHOT(스크린샷 OCR) / RECORDING(회의 녹음 변환) / EXTENSION(브라우저 확장, 향후)
+      enum: [TYPED, SCREENSHOT, RECORDING, EXTENSION]
+    SourceType:
+      type: string
+      description: MESSAGE(메시지 1건) / MEETING_NOTE(회의 녹음 변환 텍스트 전체)
+      enum: [MESSAGE, MEETING_NOTE]
+    IntentType:
+      type: string
+      description: |
+        문장의 실제 의도
+        REQUEST(요청) / DECISION(결정 통보) / DECLINE(완곡한 거절) / SHARE(단순 공유) / QUESTION(질문)
+      enum: [REQUEST, DECISION, DECLINE, SHARE, QUESTION]
+    CardStatus:
+      type: string
+      enum: [LEARNING, MASTERED, PAUSED]
+    ReviewRating:
+      type: string
+      description: 다시 / 애매 / 좋음 / 완벽
+      enum: [AGAIN, HARD, GOOD, EASY]
+    UserRole:
+      type: string
+      description: 운영자 계정 구분 (ADMIN은 판교어 사전 시드 데이터를 넣는 운영자, 별도 관리 API 없음)
+      enum: [MEMBER, ADMIN]
+    JobGroup:
+      type: string
+      description: 직군 (온보딩 S-00-1)
+      enum: [개발, 기획, 디자인, 영업, HR, 기타]
+    DevicePlatform:
+      type: string
+      enum: [IOS, WEB]
+    RecordingStatus:
+      type: string
+      description: RECORDING(녹음 중) → UPLOADED → TRANSCRIBING → DONE / FAILED
+      enum: [RECORDING, UPLOADED, TRANSCRIBING, DONE, FAILED]
+    LevelCode:
+      type: string
+      enum: [OUTSIDER, TOURIST, SETTLER, NATIVE, LOCAL]
+      description: 판교 등급 5단계, 외지인(0~19) → 관광객(20~39) → 이주민(40~64) → 원주민(65~84) → 토박이(85~100)
+
+    # ---------- 도메인 공통 스키마 ----------
+    UserBrief:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+          example: 8
+        nickname:
+          type: string
+          example: 판교뉴비
+
+    Level:
+      type: object
+      properties:
+        code:
+          $ref: '#/components/schemas/LevelCode'
+        name:
+          type: string
+          example: 원주민
+        minScore:
+          type: integer
+          example: 65
+        maxScore:
+          type: integer
+          example: 84
+        badgeImageUrl:
+          type: string
+          format: uri
+          example: https://cdn.mwonmalingyo.kr/badges/native.svg
+
+    TermSummary:
+      type: object
+      properties:
+        termId:
+          type: integer
+          format: int64
+          example: 3
+        slug:
+          type: string
+          example: align
+        termKo:
+          type: string
+          example: 얼라인
+        originEn:
+          type: string
+          example: align
+        plainKo:
+          type: string
+          example: 방향 맞추기
+        category:
+          $ref: '#/components/schemas/TermCategory'
+        inMyCards:
+          type: boolean
+          description: 로그인 사용자가 이미 카드로 담았는지
+          example: true
+        cardId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 담은 카드 ID (없으면 null)
+          example: 88
+        createdAt:
+          type: string
+          format: date-time
+
+    TermDetail:
+      allOf:
+        - $ref: '#/components/schemas/TermSummary'
+        - type: object
+          properties:
+            meaning:
+              type: string
+              example: 여러 사람의 이해와 목표를 같은 방향으로 맞추는 것.
+            viewCount:
+              type: integer
+              example: 310
+            createdBy:
+              $ref: '#/components/schemas/UserBrief'
+            myCard:
+              type: object
+              allOf:
+                - $ref: '#/components/schemas/CardLearningState'
+              nullable: true
+              description: 내 학습 상태 (담지 않았으면 null)
+            examples:
+              type: array
+              items:
+                $ref: '#/components/schemas/TermExample'
+
+    TermExample:
+      type: object
+      properties:
+        exampleId:
+          type: integer
+          format: int64
+          example: 15
+        termId:
+          type: integer
+          format: int64
+          example: 3
+        sentenceJargon:
+          type: string
+          example: 이번 주까지 팀 간 얼라인 부탁드려요.
+        sentencePlain:
+          type: string
+          example: 이번 주까지 팀끼리 방향을 맞춰 주세요.
+        createdBy:
+          $ref: '#/components/schemas/UserBrief'
+        createdAt:
+          type: string
+          format: date-time
+
+    CardLearningState:
+      type: object
+      description: 용어 상세 화면에 표시하는 내 학습 상태
+      properties:
+        cardId:
+          type: integer
+          format: int64
+          example: 88
+        status:
+          $ref: '#/components/schemas/CardStatus'
+        intervalDays:
+          type: integer
+          example: 3
+        repetitionCount:
+          type: integer
+          example: 4
+        dueDate:
+          type: string
+          format: date
+          example: '2026-09-19'
+
+    # ---------- Auth / User ----------
+    OAuthLoginRequest:
+      type: object
+      required: [code, redirectUri]
+      properties:
+        code:
+          type: string
+          description: 제공자 인증 화면에서 받은 authorization code
+          example: 4/0AY0e-g7_example_code
+        redirectUri:
+          type: string
+          format: uri
+          description: 인증 요청에 사용한 리다이렉트 URI (검증용)
+          example: http://localhost:3000/auth/callback
+
+    AuthResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+          example: eyJhbGciOiJIUzI1NiJ9...
+        isNewUser:
+          type: boolean
+          description: 이번 요청으로 가입이 새로 생성됐는지
+          example: true
+        needsOnboarding:
+          type: boolean
+          description: true면 화면을 S-00-1 온보딩으로 보냄
+          example: true
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    OnboardingRequest:
+      type: object
+      required: [jobGroup, knownTermIds]
+      properties:
+        jobGroup:
+          $ref: '#/components/schemas/JobGroup'
+        knownTermIds:
+          type: array
+          description: 진단 목록 중 "뜻을 안다"고 체크한 용어 ID (나머지는 카드로 자동 생성)
+          items:
+            type: integer
+            format: int64
+          example: [3, 12, 18]
+        reminderHour:
+          type: integer
+          description: 복습 알림 시각 (0~23, 기본 18시 = 퇴근길)
+          minimum: 0
+          maximum: 23
+          default: 18
+          example: 18
+
+    OnboardingResponse:
+      type: object
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        createdCardCount:
+          type: integer
+          description: 자동 생성된 학습 카드 수
+          example: 7
+        knownCount:
+          type: integer
+          example: 3
+        estimatedLevel:
+          $ref: '#/components/schemas/Level'
+
+    UserResponse:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+          example: 8
+        email:
+          type: string
+          format: email
+          example: newbie@pangyo.com
+        nickname:
+          type: string
+          example: 판교뉴비
+        jobGroup:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/JobGroup'
+          nullable: true
+          description: 온보딩 전이면 null
+        profileImageUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: OAuth 프로필 이미지 (users.profile_image_url)
+        role:
+          $ref: '#/components/schemas/UserRole'
+        bestScore:
+          type: integer
+          example: 60
+        currentStreak:
+          type: integer
+          description: 연속 복습 일수
+          example: 7
+        level:
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/Level'
+          nullable: true
+        currentProjectId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 웹, 앱에서 마지막으로 고른 프로젝트
+          example: 7
+        reminderHour:
+          type: integer
+          example: 18
+        actionAlertEnabled:
+          type: boolean
+          example: true
+        createdAt:
+          type: string
+          format: date-time
+
+    UserUpdateRequest:
+      type: object
+      description: 부분 수정, 하나 이상
+      minProperties: 1
+      properties:
+        nickname:
+          type: string
+          minLength: 2
+          maxLength: 30
+          example: 판교원주민
+        jobGroup:
+          $ref: '#/components/schemas/JobGroup'
+        currentProjectId:
+          type: integer
+          format: int64
+          description: 웹, 앱에서 마지막으로 고른 프로젝트 (A-10)
+          example: 7
+
+    UserStatsResponse:
+      type: object
+      properties:
+        openActionCount:
+          type: integer
+          description: 아직 안 끝낸 할 일 수 (홈 화면 첫 번째 숫자)
+          example: 4
+        dueCount:
+          type: integer
+          description: 오늘 복습해야 할 카드 수 (홈 화면 두 번째 숫자)
+          example: 12
+        totalCards:
+          type: integer
+          example: 57
+        masteredCards:
+          type: integer
+          example: 19
+        currentStreak:
+          type: integer
+          example: 7
+        longestStreak:
+          type: integer
+          example: 14
+        totalReviews:
+          type: integer
+          description: 누적 복습 횟수
+          example: 342
+        retentionSeries:
+          type: array
+          description: 기억률 곡선 (날짜별 GOOD 이상 비율)
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+                format: date
+                example: '2026-09-15'
+              retention:
+                type: number
+                format: float
+                description: 0.0 ~ 1.0
+                example: 0.83
+              reviewedCount:
+                type: integer
+                example: 12
+
+    # ---------- Translation ----------
+    TranslationRequest:
+      type: object
+      required: [sourceText, direction]
+      properties:
+        projectId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 없으면 사용자의 현재 프로젝트(currentProjectId)
+          example: 7
+        meetingId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 붙일 회의 (W-01 "붙일 회의"). 없으면 회의 밖 해석
+          example: 12
+        sourceText:
+          type: string
+          minLength: 1
+          maxLength: 500
+          example: 이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요
+        direction:
+          $ref: '#/components/schemas/TranslationDirection'
+        inputSource:
+          allOf:
+            - $ref: '#/components/schemas/InputSource'
+          default: TYPED
+        sourceImageUrl:
+          type: string
+          format: uri
+          nullable: true
+          description: 스크린샷 입력일 때 /uploads/ocr이 돌려준 이미지 URL
+          example: https://cdn.mwonmalingyo.kr/uploads/2026/09/16/abc123.png
+      example:
+        projectId: 7
+        meetingId: 12
+        sourceText: 이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요
+        direction: JARGON_TO_PLAIN
+        inputSource: TYPED
+
+    OcrResponse:
+      type: object
+      properties:
+        extractedText:
+          type: string
+          description: 추출된 글자 (사용자가 수정 후 해석 실행)
+          example: 이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요
+        imageUrl:
+          type: string
+          format: uri
+          example: https://cdn.mwonmalingyo.kr/uploads/2026/09/16/abc123.png
+        confidence:
+          type: number
+          format: float
+          description: 0.7 미만이면 "글자를 확인해 주세요" 경고 노출
+          minimum: 0
+          maximum: 1
+          example: 0.94
+
+    DetectedTerm:
+      type: object
+      properties:
+        termId:
+          type: integer
+          format: int64
+          nullable: true
+          description: 사전에 없는 신규 판교어면 null (AI 해석만 제공)
+          example: 3
+        termKo:
+          type: string
+          description: 사전 용어명. termId가 null이면 AI가 정한 이름 (translation_terms.ai_term_ko)
+          example: 얼라인
+        plainKo:
+          type: string
+          description: 쉬운 말. termId가 null이면 AI 해석 (translation_terms.ai_plain_ko)
+          example: 방향 맞추기
+        matchedText:
+          type: string
+          example: 얼라인
+        startIndex:
+          type: integer
+          description: 원문 하이라이트 시작 위치 (0부터, 포함)
+          example: 40
+        endIndex:
+          type: integer
+          description: 원문 하이라이트 끝 위치 (포함하지 않음)
+          example: 43
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.972
+        inMyCards:
+          type: boolean
+          example: false
+
+    NuanceInfo:
+      type: object
+      description: 완곡 표현의 실제 의도 해석 (💭 블록)
+      properties:
+        note:
+          type: string
+          description: 숨은 뜻 설명
+          example: '"밀죠"는 제안형이지만 실제로는 이미 결정된 내용을 통보하는 표현입니다.'
+        tip:
+          type: string
+          description: 대응 팁
+          example: 되묻기보다 일정만 확인하는 편이 안전합니다.
+        confidence:
+          type: number
+          format: float
+          minimum: 0
+          maximum: 1
+          example: 0.88
+
+    ActionItem:
+      type: object
+      description: 해석으로 추출된 할 일 (🎯 블록)
+      properties:
+        actionId:
+          type: integer
+          format: int64
+          example: 5001
+        sortOrder:
+          type: integer
+          example: 1
+        actionText:
+          type: string
+          example: 담당자별 역할 정리 문서 만들기
+        dueHint:
+          type: string
+          nullable: true
+          description: 원문에서 읽어낸 기한 힌트
+          example: 다음 스프린트 시작 전
+        dueAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: 알림 기준 시각 (dueHint를 해석한 값, translation_actions.due_at). 없으면 마감 알림을 보내지 않음
+          example: '2026-09-16T17:30:00'
+        isChecked:
+          type: boolean
+          example: false
+        alertEnabled:
+          type: boolean
+          description: 마감 30분 전 알림 (W-03 스위치)
+          example: true
+        checkedAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    ActionWithSource:
+      allOf:
+        - $ref: '#/components/schemas/ActionItem'
+        - type: object
+          properties:
+            translationId:
+              type: integer
+              format: int64
+              example: 1024
+            projectId:
+              type: integer
+              format: int64
+              example: 7
+            projectName:
+              type: string
+              example: 루나
+            meetingId:
+              type: integer
+              format: int64
+              nullable: true
+              description: null이면 메시지 해석에서 나온 할 일
+              example: 12
+            meetingTitle:
+              type: string
+              nullable: true
+              example: 스프린트 계획 회의
+            sourceText:
+              type: string
+              description: 이 할 일이 나온 원문 (어떤 메시지였는지 보여주기 위함)
+              example: 이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요
+            createdAt:
+              type: string
+              format: date-time
+
+    ActionUpdateRequest:
+      type: object
+      description: 둘 중 하나 이상
+      minProperties: 1
+      properties:
+        isChecked:
+          type: boolean
+          example: true
+        alertEnabled:
+          type: boolean
+          example: true
+
+    MeetingRequest:
+      type: object
+      required: [title, heldAt]
+      properties:
+        title:
+          type: string
+          maxLength: 100
+          example: 스프린트 계획 회의
+        heldAt:
+          type: string
+          format: date-time
+          example: '2026-09-17T10:00:00'
+        attendeeCount:
+          type: integer
+          minimum: 1
+          example: 4
+        agenda:
+          type: string
+          maxLength: 200
+          nullable: true
+          example: 이번 스프린트 범위 정하기
+
+    MeetingSummary:
+      type: object
+      properties:
+        meetingId:
+          type: integer
+          format: int64
+          example: 12
+        projectId:
+          type: integer
+          format: int64
+          example: 7
+        title:
+          type: string
+          example: 스프린트 계획 회의
+        heldAt:
+          type: string
+          format: date-time
+        attendeeCount:
+          type: integer
+          example: 4
+        recordingDurationSec:
+          type: integer
+          nullable: true
+          description: 녹음이 없으면 null
+          example: 1868
+        translationCount:
+          type: integer
+          example: 2
+        openActionCount:
+          type: integer
+          example: 2
+        unknownTermCount:
+          type: integer
+          example: 4
+
+    MeetingDetail:
+      allOf:
+        - $ref: '#/components/schemas/MeetingSummary'
+        - type: object
+          properties:
+            agenda:
+              type: string
+              nullable: true
+            recordings:
+              type: array
+              items:
+                $ref: '#/components/schemas/RecordingResponse'
+            translations:
+              type: array
+              items:
+                $ref: '#/components/schemas/TranslationSummary'
+            actions:
+              type: array
+              items:
+                $ref: '#/components/schemas/ActionItem'
+            terms:
+              type: array
+              description: 이 회의에서 나온 모르는 말 (카드 담김 여부 포함)
+              items:
+                type: object
+                properties:
+                  termId:
+                    type: integer
+                    format: int64
+                  termKo:
+                    type: string
+                    example: 스코프 아웃
+                  inMyCards:
+                    type: boolean
+                    example: false
+
+    ProjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+          example: 루나
+        description:
+          type: string
+          maxLength: 60
+          example: 고객센터 챗봇
+        color:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          example: '#2F6FD6'
+
+    ProjectResponse:
+      type: object
+      properties:
+        projectId:
+          type: integer
+          format: int64
+          example: 7
+        name:
+          type: string
+          example: 루나
+        description:
+          type: string
+          example: 고객센터 챗봇
+        meetingCount:
+          type: integer
+          example: 4
+        color:
+          type: string
+          example: '#2F6FD6'
+        translationCount:
+          type: integer
+          description: 해석 수 (회의 안 + 회의 밖)
+          example: 7
+        openActionCount:
+          type: integer
+          example: 4
+        unknownTermCount:
+          type: integer
+          example: 12
+        isDefault:
+          type: boolean
+          description: 온보딩에서 건너뛰면 자동 생성되는 "내 프로젝트"
+          example: false
+        lastActivityAt:
+          type: string
+          format: date-time
+          description: 마지막 활동 시각 (프로젝트 안 회의, 해석의 최신 created_at, 없으면 projects.updated_at)
+        createdAt:
+          type: string
+          format: date-time
+
+    TranslationResponse:
+      type: object
+      properties:
+        translationId:
+          type: integer
+          format: int64
+          example: 1024
+        projectId:
+          type: integer
+          format: int64
+          example: 7
+        projectName:
+          type: string
+          example: 루나
+        meetingId:
+          type: integer
+          format: int64
+          nullable: true
+          description: null이면 메시지 해석(회의와 무관)
+          example: 12
+        meetingTitle:
+          type: string
+          nullable: true
+          example: 스프린트 계획 회의
+        sourceType:
+          $ref: '#/components/schemas/SourceType'
+        inputSource:
+          $ref: '#/components/schemas/InputSource'
+        direction:
+          $ref: '#/components/schemas/TranslationDirection'
+        sourceText:
+          type: string
+        resultText:
+          type: string
+        jargonCount:
+          type: integer
+          description: 0이면 청정 한국어 빈 상태를 노출
+          example: 3
+        intentType:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/IntentType'
+          nullable: true
+        nuance:
+          type: object
+          allOf:
+            - $ref: '#/components/schemas/NuanceInfo'
+          nullable: true
+          description: 해석할 뉘앙스가 없으면 null (💭 블록 숨김)
+        actionItems:
+          type: array
+          description: 비어 있으면 🎯 블록 숨김
+          items:
+            $ref: '#/components/schemas/ActionItem'
+        aiModel:
+          type: string
+          example: claude-opus-5
+        latencyMs:
+          type: integer
+          example: 820
+        detectedTerms:
+          type: array
+          items:
+            $ref: '#/components/schemas/DetectedTerm'
+        createdAt:
+          type: string
+          format: date-time
+
+    TranslationSummary:
+      type: object
+      properties:
+        translationId:
+          type: integer
+          format: int64
+        projectId:
+          type: integer
+          format: int64
+        title:
+          type: string
+          description: 원문 앞부분
+          example: 스코프 아웃하고 넥스트로 밀죠…
+        meetingId:
+          type: integer
+          format: int64
+          nullable: true
+        inputSource:
+          $ref: '#/components/schemas/InputSource'
+        direction:
+          $ref: '#/components/schemas/TranslationDirection'
+        sourceText:
+          type: string
+        resultText:
+          type: string
+        jargonCount:
+          type: integer
+        intentType:
+          type: string
+          allOf:
+            - $ref: '#/components/schemas/IntentType'
+          nullable: true
+        actionCount:
+          type: integer
+          description: 추출된 할 일 개수
+          example: 2
+        openActionCount:
+          type: integer
+          description: 아직 체크하지 않은 할 일 개수
+          example: 1
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---------- Card ----------
+    CardCreateRequest:
+      type: object
+      required: [termId]
+      properties:
+        termId:
+          type: integer
+          format: int64
+          example: 3
+        memo:
+          type: string
+          maxLength: 300
+          example: 팀장님이 제일 많이 쓰는 말
+
+    CardBulkCreateRequest:
+      type: object
+      required: [termIds]
+      properties:
+        termIds:
+          type: array
+          minItems: 1
+          maxItems: 50
+          items:
+            type: integer
+            format: int64
+          example: [3, 7, 12]
+
+    CardBulkCreateResponse:
+      type: object
+      required: [createdCount, skippedCount, cards]
+      properties:
+        createdCount:
+          type: integer
+          example: 3
+        skippedCount:
+          type: integer
+          description: 이미 담겨 있어 건너뛴 수
+          example: 1
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CardResponse'
+
+    CardUpdateRequest:
+      type: object
+      description: 부분 수정, 하나 이상
+      minProperties: 1
+      properties:
+        memo:
+          type: string
+          maxLength: 300
+          example: 회의 때 제일 자주 나옴
+        status:
+          $ref: '#/components/schemas/CardStatus'
+
+    CardResponse:
+      type: object
+      properties:
+        cardId:
+          type: integer
+          format: int64
+          example: 88
+        term:
+          $ref: '#/components/schemas/TermSummary'
+        status:
+          $ref: '#/components/schemas/CardStatus'
+        memo:
+          type: string
+          nullable: true
+          example: 팀장님이 제일 많이 쓰는 말
+        intervalDays:
+          type: integer
+          example: 3
+        easeFactor:
+          type: number
+          format: float
+          example: 2.5
+        repetitionCount:
+          type: integer
+          example: 4
+        lapseCount:
+          type: integer
+          example: 1
+        dueDate:
+          type: string
+          format: date
+          example: '2026-09-19'
+        lastReviewedAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+
+    # ---------- Review ----------
+    ReviewStartRequest:
+      type: object
+      properties:
+        limit:
+          type: integer
+          description: 이번 세션에서 복습할 최대 카드 수
+          minimum: 1
+          maximum: 50
+          default: 20
+          example: 20
+
+    ReviewCard:
+      type: object
+      description: 복습 화면(A-03, A-04)에 표시할 카드 1장
+      properties:
+        cardId:
+          type: integer
+          format: int64
+          example: 88
+        termId:
+          type: integer
+          format: int64
+          example: 3
+        termKo:
+          type: string
+          description: 카드 앞면
+          example: 얼라인
+        originEn:
+          type: string
+          description: 힌트 버튼에 노출
+          example: align
+        plainKo:
+          type: string
+          description: 카드 뒷면
+          example: 방향 맞추기
+        meaning:
+          type: string
+          example: 여러 사람의 이해와 목표를 같은 방향으로 맞추는 것.
+        exampleJargon:
+          type: string
+          nullable: true
+          example: 이번 주까지 팀 간 얼라인 부탁드려요.
+        examplePlain:
+          type: string
+          nullable: true
+          example: 이번 주까지 팀끼리 방향을 맞춰 주세요.
+        intervalDays:
+          type: integer
+          example: 1
+        repetitionCount:
+          type: integer
+          example: 1
+        source:
+          type: object
+          nullable: true
+          description: 처음 담긴 곳 (cards.source_translation_id), A-03 출처 칩
+          properties:
+            projectName:
+              type: string
+              example: 루나
+            meetingTitle:
+              type: string
+              nullable: true
+              example: 스프린트 계획 회의
+
+    ReviewSessionResponse:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+          format: int64
+          example: 501
+        targetCount:
+          type: integer
+          example: 12
+        startedAt:
+          type: string
+          format: date-time
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReviewCard'
+
+    ReviewAnswerRequest:
+      type: object
+      required: [cardId, rating]
+      properties:
+        cardId:
+          type: integer
+          format: int64
+          example: 88
+        rating:
+          $ref: '#/components/schemas/ReviewRating'
+        elapsedMs:
+          type: integer
+          description: 답을 떠올리는 데 걸린 시간
+          example: 4200
+
+    ReviewAnswerResponse:
+      type: object
+      properties:
+        cardId:
+          type: integer
+          format: int64
+          example: 88
+        rating:
+          $ref: '#/components/schemas/ReviewRating'
+        prevIntervalDays:
+          type: integer
+          example: 1
+        nextIntervalDays:
+          type: integer
+          description: 화면에 "3일 뒤"로 표시
+          example: 3
+        nextDueDate:
+          type: string
+          format: date
+          example: '2026-09-19'
+        easeFactor:
+          type: number
+          format: float
+          example: 2.5
+        repetitionCount:
+          type: integer
+          example: 2
+        cardStatus:
+          $ref: '#/components/schemas/CardStatus'
+        remainingCount:
+          type: integer
+          description: 이번 세션에 남은 카드 수
+          example: 9
+
+    ReviewResultResponse:
+      type: object
+      properties:
+        sessionId:
+          type: integer
+          format: int64
+          example: 501
+        targetCount:
+          type: integer
+          example: 12
+        completedCount:
+          type: integer
+          example: 12
+        goodRate:
+          type: number
+          format: float
+          description: GOOD 이상 비율 (0.0 ~ 1.0)
+          example: 0.83
+        currentStreak:
+          type: integer
+          example: 8
+        nextDueDate:
+          type: string
+          format: date
+          nullable: true
+          example: '2026-09-19'
+        nextDueCount:
+          type: integer
+          example: 5
+        finishedAt:
+          type: string
+          format: date-time
+        hardCards:
+          type: array
+          description: 오늘 헷갈린 카드 (AGAIN/HARD 평가)
+          items:
+            $ref: '#/components/schemas/TermSummary'
+
+    # ---------- Exam ----------
+    QuizStartRequest:
+      type: object
+      properties:
+        questionCount:
+          type: integer
+          minimum: 5
+          maximum: 20
+          default: 5
+          description: 기본 5문제 (퇴근길 3분 분량)
+          example: 5
+        category:
+          $ref: '#/components/schemas/TermCategory'
+
+    QuizQuestion:
+      type: object
+      properties:
+        questionId:
+          type: integer
+          format: int64
+          example: 9001
+        sortOrder:
+          type: integer
+          example: 1
+        termId:
+          type: integer
+          format: int64
+          example: 3
+        questionText:
+          type: string
+          example: '"얼라인"의 뜻으로 알맞은 것은?'
+        choices:
+          type: array
+          maxItems: 4
+          items:
+            type: string
+          example: [방향 맞추기, 일정 미루기, 예산 줄이기, 담당자 바꾸기]
+
+    QuizSessionResponse:
+      type: object
+      properties:
+        quizId:
+          type: integer
+          format: int64
+          example: 77
+        questionCount:
+          type: integer
+          example: 5
+        startedAt:
+          type: string
+          format: date-time
+        questions:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuizQuestion'
+
+    QuizSubmitRequest:
+      type: object
+      required: [answers]
+      properties:
+        answers:
+          type: array
+          minItems: 1
+          items:
+            type: object
+            required: [questionId, selectedIndex]
+            properties:
+              questionId:
+                type: integer
+                format: int64
+                example: 9001
+              selectedIndex:
+                type: integer
+                minimum: 0
+                maximum: 3
+                example: 0
+
+    QuizAnswerResult:
+      type: object
+      properties:
+        questionId:
+          type: integer
+          format: int64
+        termId:
+          type: integer
+          format: int64
+        termKo:
+          type: string
+          example: 얼라인
+        questionText:
+          type: string
+        choices:
+          type: array
+          items:
+            type: string
+        answerIndex:
+          type: integer
+          example: 0
+        selectedIndex:
+          type: integer
+          nullable: true
+          example: 2
+        isCorrect:
+          type: boolean
+          example: false
+
+    QuizResultResponse:
+      type: object
+      properties:
+        quizId:
+          type: integer
+          format: int64
+          example: 77
+        questionCount:
+          type: integer
+          example: 5
+        correctCount:
+          type: integer
+          example: 3
+        score:
+          type: integer
+          example: 60
+        level:
+          $ref: '#/components/schemas/Level'
+        levelUp:
+          type: boolean
+          description: 이전 등급보다 올랐는지 (축하 애니메이션 트리거)
+          example: true
+        finishedAt:
+          type: string
+          format: date-time
+        wrongTermIds:
+          type: array
+          description: 틀린 용어 ID (카드 일괄 담기에 사용)
+          items:
+            type: integer
+            format: int64
+          example: [7, 12]
+        answers:
+          type: array
+          items:
+            $ref: '#/components/schemas/QuizAnswerResult'
+
+    QuizSummary:
+      type: object
+      properties:
+        quizId:
+          type: integer
+          format: int64
+        score:
+          type: integer
+        correctCount:
+          type: integer
+        questionCount:
+          type: integer
+        levelCode:
+          $ref: '#/components/schemas/LevelCode'
+        finishedAt:
+          type: string
+          format: date-time

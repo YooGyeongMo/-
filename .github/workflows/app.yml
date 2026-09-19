@@ -1,0 +1,30 @@
+name: app
+on:
+  pull_request: { paths: ["apps/**", "contracts/**", "packages/test-vectors/**", ".github/workflows/app.yml", ".swiftlint.yml", ".swiftformat"] }
+  push: { branches: [main], paths: ["apps/**", "contracts/**"] }
+concurrency: { group: app-${{ github.ref }}, cancel-in-progress: true }
+jobs:
+  lint:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: brew install swiftlint
+      - run: swiftlint --strict
+      - run: swiftformat --lint .
+  build-test:
+    runs-on: macos-15   # self-hosted 러너 등록 후 [self-hosted, macOS]로 전환 (ADR-0002)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - uses: maxim-lobanov/setup-xcode@v1
+        with: { xcode-version: "26" }
+      - uses: actions/cache@v4
+        with:
+          path: |
+            apps/ios-macos/.tuist-cache
+            apps/ios-macos/Tuist/.build
+          key: tuist-${{ runner.os }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'contracts/openapi.yml') }}
+      - run: cd apps/ios-macos && tuist install && tuist generate --no-open
+      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build | xcbeautify || xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build
+      - run: cd apps/ios-macos && tuist test --no-open

@@ -1,0 +1,19 @@
+name: 버그
+description: 재현 가능한 문제
+title: "[bug][area] "
+labels: ["type:fix"]
+body:
+  - type: textarea
+    id: repro
+    attributes: { label: 재현 단계 }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: 기대 / 실제 }
+    validations: { required: true }
+  - type: input
+    id: env
+    attributes: { label: 환경 (OS·빌드·서버 env·Request-Id) }
+  - type: textarea
+    id: evidence
+    attributes: { label: 증거 (로그·Sentry 링크·스크린샷) }
