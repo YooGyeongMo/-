@@ -1,0 +1,18 @@
+{
+  "aps": {
+    "alert": { "title": "오늘의 복습", "body": "복습할 카드 7장이 기다려요" },
+    "badge": 7,
+    "sound": "default",
+    "category": "REVIEW_DUE",
+    "thread-id": "review",
+    "interruption-level": "active",
+    "relevance-score": 0.6
+  },
+  "mw": {
+    "v": 1,
+    "type": "REVIEW_DUE",
+    "deepLink": "mwonmal://review?notificationId=9001",
+    "notificationId": 9001,
+    "dueCount": 7
+  }
+}

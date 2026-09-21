@@ -10,7 +10,16 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["pytest>=8", "httpx>=0.27", "ruff>=0.6", "mypy>=1.11", "schemathesis>=3.39", "types-PyYAML"]
+dev = [
+  "pytest>=8",
+  "httpx>=0.27",
+  "ruff>=0.6",
+  "mypy>=1.11",
+  "schemathesis>=3.39",
+  "types-PyYAML",
+  "jsonschema>=4.23",
+  "types-jsonschema",
+]
 
 [tool.ruff]
 line-length = 100

@@ -1,0 +1,17 @@
+{
+  "aps": {
+    "alert": { "title": "등급이 올랐어요", "body": "이주민 → 원주민" },
+    "sound": "default",
+    "category": "LEVEL_UP",
+    "thread-id": "level",
+    "interruption-level": "passive",
+    "relevance-score": 0.4
+  },
+  "mw": {
+    "v": 1,
+    "type": "LEVEL_UP",
+    "deepLink": "mwonmal://level?notificationId=9004",
+    "notificationId": 9004,
+    "quizId": 77
+  }
+}

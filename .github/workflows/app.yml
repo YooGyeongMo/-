@@ -1,3 +1,8 @@
+# 앱 CI (ADR-0011: CI 러너 전략 개정, ADR-0002 supersede — FD-9)
+#  - PR·push main = hosted macos-26, Xcode 26.4 고정(로컬과 동일; 올릴 때 스냅샷 재기록 PR과 함께). Tier1 만.
+#  - nightly     = self-hosted(개발 Mac, 별도 macOS 계정, ephemeral 러너). schedule·workflow_dispatch·push main 만 —
+#                  공개 저장소 fork PR 코드는 self-hosted 에서 절대 실행하지 않는다(RT-B-20). Tier2: iOS 17.0 최소 OS 시뮬.
+#  - 동시 job 5 한도 → PR macOS job ≤ 4.
 name: app
 on:
   pull_request:
@@ -5,33 +10,63 @@ on:
   push:
     branches: [main]
     paths: ["apps/**", "contracts/**"]
+  schedule:
+    - cron: "0 18 * * *"   # 03:00 KST (UTC+9) — ADR-0011 야간 Tier2
+  workflow_dispatch:
 concurrency:
   group: app-${{ github.ref }}
   cancel-in-progress: true
+env:
+  XCODE_VERSION: "26.4"
 jobs:
   lint:
-    runs-on: macos-15
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
+      - uses: actions/cache@v4
+        with:
+          path: ~/Library/Caches/Homebrew
+          key: brew-${{ runner.os }}-swiftlint
       - run: brew install swiftlint
       - run: swiftlint --strict
       - run: swiftformat --lint .
   build-test:
-    # hosted macos-15는 호스트 OS가 15라 macOS 26 타깃 테스트를 못 돌린다 → 단위 테스트는 iOS 26 시뮬레이터로. macOS 실행 테스트는 self-hosted(macOS 26) 러너에서 (ADR-0002).
-    runs-on: macos-15
+    # Tier1 (FD-1 검증 매트릭스): macOS 26 호스트 빌드+테스트 + iPhone 17 / iOS 26 시뮬레이터 테스트.
+    # deployment target 이 iOS 17 / macOS 14 이므로 @available 누락은 컴파일 단계에서 잡힌다(REQ-02).
+    # iOS 17.0 최소 OS 런타임 실행은 nightly(self-hosted)에서 — ADR-0011.
+    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    runs-on: macos-26
+    needs: lint
     steps:
       - uses: actions/checkout@v4
       - uses: jdx/mise-action@v2
       - uses: maxim-lobanov/setup-xcode@v1
         with:
-          xcode-version: latest-stable
+          xcode-version: '26.4'
       - uses: actions/cache@v4
         with:
           path: |
             apps/ios-macos/.tuist-cache
             apps/ios-macos/Tuist/.build
-          key: tuist-${{ runner.os }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'contracts/openapi.yml') }}
+          key: tuist-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'contracts/openapi.yml') }}
       - run: cd apps/ios-macos && tuist install && tuist generate --no-open
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build
-      - run: cd apps/ios-macos && tuist test MwonmalIOS --no-selective-testing
+      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation test
+      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalIOS -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' -skipPackagePluginValidation test
+  nightly:
+    # Tier2 (ADR-0011 / FD-9): 최소 OS iOS 17.0 시뮬레이터(iPhone SE 3세대) 단위 테스트. hosted 이미지엔 17.0 런타임이 없어
+    # self-hosted 러너(iOS 17.0 런타임·Xcode 26.4 사전 설치)에서만 돈다. fork PR 코드 실행 금지 → pull_request 제외.
+    if: github.event_name != 'pull_request'
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: jdx/mise-action@v2
+      - run: xcodebuild -version | grep -q "Xcode ${XCODE_VERSION}"   # 러너에 26.4 사전 설치·선택되어 있어야 함(sudo 없이 검증만)
+      - run: xcrun simctl list runtimes | grep -q "iOS 17.0" || xcodebuild -downloadPlatform iOS -buildVersion 17.0
+      - run: xcrun simctl list devices available | grep -q "iPhone SE (3rd generation)" || xcrun simctl create "iPhone SE (3rd generation)" "iPhone SE (3rd generation)" "com.apple.CoreSimulator.SimRuntime.iOS-17-0"
+      - run: cd apps/ios-macos && tuist install && tuist generate --no-open
+      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalIOS -destination 'platform=iOS Simulator,name=iPhone SE (3rd generation),OS=17.0' -skipPackagePluginValidation test
+      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation test

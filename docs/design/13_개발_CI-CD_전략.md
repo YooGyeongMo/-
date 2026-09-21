@@ -2,6 +2,7 @@
 
 > 대상: 뭔말인교? iOS·macOS 앱(`12_앱_아키텍처_설계.md`)과 서버(`14_시스템_설계서.md`).
 > 혼자 만들되 팀처럼 돌아가게. 규칙은 적게, 대신 전부 자동으로 강제한다.
+> v1.1 (2026-09-21): 협의체 1차 FD-9(CI 러너, ADR-0011)·FD-1(최소 OS)·FD-4(프라이버시 테스트)·FD-5(평가셋 회귀)·FD-8(릴리스 분리) 반영. 폐기는 "폐기 2026-09-21 → FD-x"로 남긴다.
 
 ---
 
@@ -38,8 +39,9 @@
 | S2 | 해석 흐름 (Compose·결과·카드) | Translation(AI 연동), Term, Card | |
 | S3 | 회의 흐름 (녹음·폴링·결과) | Recording 파이프라인(조각·STT·해석·알림) | `durationSec` 누적 합의 |
 | S4 | 익히기 (복습·테스트·등급) | Review(SM-2), Quiz, Level | |
-| S5 | live 연결, 알림 4종, Sentry·Amplitude | APNs, 스케줄러(알림·30일 삭제), 관측 | yml v1.1 (MACOS, refresh, Idempotency-Key…) |
-| S6 | 마감(Catalog, 스냅샷, 접근성, TestFlight) | 부하 테스트, 백업 복구 연습, 런북 | |
+| S5 | live 연결(OCI Free), iOS·iPad 알림 4종(macOS v1.1), Sentry·Amplitude(이벤트 6개) + 카나리 | APNs, 스케줄러, 집계 cron, 관측(대시보드 2), `cost_model` | yml v1.1 초안 15+3건(12번 §13-1) |
+| S6 | 마감(Catalog, 스냅샷 Tier1/2, 접근성, **iOS·iPad TestFlight 11/6**) | k6 1회, 백업 복구 연습, 런북 | |
+| v1.0.1 | **macOS TestFlight 11/13**(커밋 해시 = `app/v1.0.0`) | | |
 
 규칙: 스프린트마다 **앱이 서버와 실제로 통신하는 데모**를 남긴다(짧은 영상). 서버가 늦으면 앱은 Prism 목 서버(yml 예시 응답)로 진행한다.
 
@@ -50,15 +52,19 @@
 앱
 - `swiftlint --strict`, `swiftformat --lint` (별도 job, 빌드 플러그인 아님)
 - Presentation 폴더 간 import 금지: SwiftLint `custom_rules` 정규식
+- **SwiftLint custom_rules 3개 (2026-09-21, FD-1·2·10; S0 warning → Day 13 error)**: `no_available_in_core`(`#available|@available`을 `Platform/`·`MwonmalUI/Compat/`·`Composition/` 밖에서 금지, 12번 §18), `no_fixed_height`(`.frame(height: <숫자>)`·`.frame(width:height:)` 리터럴 금지, 토큰 파일 제외), `no_inline_animation_literal`(`.animation(.spring|easeIn…)`·`withAnimation(.…(duration:))`·`Animation.` 직접 사용 금지, `MwonmalUI/Motion/` 제외). 보조: `disable_without_reason`(disable 주석에 이유 필수), Domain에서 `import (UIKit|AppKit|SwiftUI|AVFoundation|Vision)` 금지, `import Synchronization` 금지
+- **프라이버시 카나리 grep 테스트 (FD-4, REQ-14; PR마다)**: 입력에 `MWCANARY-<uuid>`를 넣고 나가는 모든 바이트에서 grep. 앱 = `SentryScrubber`(순수 함수) 직렬화 결과·`AnalyticsValue` enum allowlist·`no_raw_text_to_sdk` 린트(`Platform/Observability`에서 `sourceText|transcript|extractedText|resultText|audioURL` 금지). 서버 = `sentry_sdk` `CapturingTransport` envelope·구조화 로그 화이트리스트·`ai_usage` 텍스트 컬럼 0·push payload 빌더(`sourceText`·`transcript`·`action_text`·`result_text` 금지)·프롬프트 빌더에 userId·회의 제목 없음
 - `swift build`(iOS 시뮬레이터 + macOS), 생성 코드 컴파일 포함 (`-skipPackagePluginValidation`)
 - 테스트: Domain·Data·Presentation·Navigation 단위 + Contract(yml 예시 디코드) + 스냅샷
 - 커버리지: 변경 라인 ≥ 80%, `Domain/Rules` 100% (`xccov`)
 - 계약 해시: `Contracts/openapi.yml`의 SHA가 서버 태그의 것과 같은지
+- **평가셋 회귀 (FD-5·FD-9, REQ-10·12)**: `eval/run.py`는 CI에서 **캐시 재생만**(FD-4 "CI 외부 호출 0"; 캐시 키 = 모델·프롬프트 SHA·사전 SHA·문장 SHA). 실호출은 개발 Mac `make eval`(운영자 키, sops)에서만: 프롬프트 변경 PR = 로컬 20문장 결과를 PR 본문에 첨부(체크리스트), 야간 = 40문장 회전(층화 샘플 `seed=YYYYMMDD`), 릴리스 = 200문장 전체. 게이트: JSON 유효율 ≥ 98%, intent 정확도·용어 스팬 F1 baseline −3pt 이내, 할 일 F1 ≥ 0.6, 인덱스 재계산 일치 100%. baseline은 Day 11 v0로 첫 커밋, "의도적 개선 PR"에서만 갱신
 
 서버
 - `ruff`, `mypy --strict`, `bandit`
 - `pytest` (단위 + DB 통합은 testcontainers MySQL) 커버리지 ≥ 80%
-- **계약 테스트**: `schemathesis`가 yml로 모든 엔드포인트에 요청을 생성해 응답 스키마·상태 코드 검증. 이게 앱과 서버를 묶는 가장 강한 게이트.
+- **계약 테스트**: `schemathesis`가 yml로 모든 엔드포인트에 요청을 생성해 응답 스키마·상태 코드 검증. 이게 앱과 서버를 묶는 가장 강한 게이트. (현재 `|| true`는 Day 3(#4)에서 제거.) **+ `jsonschema`**로 `contracts/push-payload.schema.json` ↔ `push-examples/*.json` 4개 ↔ 서버 빌더 출력 검증(FD-3)
+- `import-linter`: 컨텍스트(`identity/workspace/decode/learning/notify`) 간 직접 import 금지, `learning`은 `decode/domain/services/engine_port.py`만 import(14번 §17)
 - 마이그레이션 검사: `alembic check`(모델과 마이그레이션 불일치 시 실패), 빈 DB에서 `upgrade head` → `downgrade base` 왕복
 - 컨테이너 이미지 취약점 스캔(`trivy`), 시크릿 스캔(`gitleaks`)
 
@@ -73,7 +79,10 @@ pull_request  ──▶ lint ──▶ build(iOS, macOS) ──▶ test(unit+con
 push main     ──▶ 위 전부 ──▶ TestFlight 내부 배포 (빌드 번호 = run number)
 tag app/v*    ──▶ 위 전부 ──▶ TestFlight 외부 그룹 ──▶ (수동 승인) App Store 제출 (iOS + Mac App Store)
 ```
-- 러너·Xcode 버전 고정(`macos-15`, Xcode 26.x) — 스냅샷 폰트 렌더 차이 방지.
+- 폐기 2026-09-21 → FD-9/ADR-0011: ~~러너·Xcode 버전 고정(`macos-15`, Xcode 26.x)~~.
+- **러너 (FD-9, ADR-0011)**: PR = hosted **`macos-26`** + **Xcode 26.4 핀**(`latest-stable` 금지; 로컬 Xcode 26.4(17E192)와 동일. 올릴 때는 스냅샷 재기록 PR과 함께). self-hosted(개발 Mac, **별도 macOS 사용자 계정·ephemeral 러너**)는 **`push main`·`schedule`·`workflow_dispatch`만** — `pull_request`에는 절대 배정하지 않는다(공개 저장소 fork PR 코드 실행 금지, RT-B-20; `pull_request_target`도 금지). self-hosted 용도: macOS 14 실행 검증(`macos-14` 이미지 2026-11-02 폐기), iOS 17.0 시뮬 스냅샷·E2E.
+- **비용·동시성**: 공개 저장소 = 표준 러너 무료(분 과금 아님). Free 플랜 macOS 동시 job 5 → PR의 macOS job ≤ 4(lint, build-test, snapshot×2). 목표 PR p50 ≤ 15분(주 1회 Actions 통계 기록).
+- **매트릭스**: PR = Tier1(단위·계약 iPhone 17 iOS 26.4 + Mac 26, 스냅샷 iPhone 17·iPad 13"·Mac 26 × DT L·AX3). main 머지 = Tier1 + Maestro 2흐름. 야간(`app-nightly.yml`, 02:00 KST) = Tier2(SE 3세대 iOS 17.0 self-hosted 단위·스냅샷·Maestro, iPad 11"/13" 세로·가로·Split 1/2, Mac 14 self-hosted VM, 6K 3화면, DT xxxLarge·AX5, reduceMotion, Mac 접근성 감사, Domain watchOS 빌드, archify `validate`, eval 40문장 캐시 재생). 릴리스 태그 = 전부 + 200문장. 실패 시 자동 이슈(`area:qa`).
 - 캐시: DerivedData + `.build`, 키 = `Package.resolved` 해시 + yml 해시.
 - 서명: fastlane `match`(암호화 저장소, 인증서·프로파일) + App Store Connect API Key `.p8` 하나. 시크릿 4개(`ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_CONTENT, MATCH_PASSWORD`). 인증서를 base64로 시크릿에 넣지 않는다.
 - 버전: `MARKETING_VERSION`은 태그에서, `CURRENT_PROJECT_VERSION`은 run number, iOS·macOS 동일.
@@ -89,7 +98,7 @@ tag server/v* ──▶ 위 전부 ──▶ prod 배포 (수동 승인 environm
 ```
 - 배포 방식: 단일 VM에 Docker Compose, `docker compose pull && docker compose up -d --wait`. 무중단이 필요해지면 두 번째 VM + 로드밸런서(§14 확장 경로). 지금은 재시작 수 초 다운을 허용한다(앱은 GET 재시도, POST는 사용자 재시도).
 - 마이그레이션은 배포 전 별도 job(`alembic upgrade head`), 실패하면 배포 중단. 파괴적 변경(컬럼 삭제)은 두 단계(코드 먼저, 다음 릴리스에 드롭).
-- 시크릿: GitHub Environments(`dev`, `prod`)에 `DATABASE_URL, REDIS_URL, JWT_PRIVATE_KEY, APNS_KEY, ANTHROPIC_API_KEY, STT_API_KEY, S3_*`, OAuth 클라이언트 시크릿 3종. VM에는 `.env`를 `sops`로 암호화해 두고 배포 시 복호화.
+- 시크릿: GitHub Environments(`dev`, `prod`)에 `DATABASE_URL, REDIS_URL, JWT_PRIVATE_KEY, APNS_KEY, GEMINI_API_KEY, S3_*`, OAuth 클라이언트 시크릿 3종, 설정 `AI_EXTERNAL_TEXT`(prod 기본 off)·`MWONMAL_AI_QUOTA__*`·`ROUTER_ALLOW_DEGRADED`. 폐기 2026-09-21 → FD-4: ~~`ANTHROPIC_API_KEY, STT_API_KEY`~~ — OpenAI·Anthropic 키는 **평가 전용**(`eval/.env`, sops, 로컬)이며 prod Environment에 없다. 외부 STT 키 없음(`whisper_local`). VM에는 `.env`를 `sops`로 암호화해 두고 배포 시 복호화.
 - 이미지: 멀티스테이지, non-root, 고정 베이스 태그, SBOM 생성.
 
 ### 5-3. 계약 동기화 (앱 ↔ 서버, 모노레포)
@@ -102,8 +111,28 @@ tag server/v* ──▶ 위 전부 ──▶ prod 배포 (수동 승인 environm
 ## 6. 릴리스
 
 - 주기: 앱 2주(TestFlight는 머지마다), 서버는 머지마다 dev, 주 1회 prod.
-- 앱 릴리스 체크리스트: 스킴 `.live` / ATS 예외 0 / Privacy 라벨 / Sentry release / 심사 노트(녹음 동의 스크린샷, 테스트 계정) / Accessibility Inspector / 스냅샷 전부 초록 / 양 플랫폼 빌드 번호 일치 / 계약 해시 일치.
-- 서버 릴리스 체크리스트: 마이그레이션 왕복 / schemathesis 초록 / 백업 최신 / 롤백 이미지 태그 기록 / 런북 링크.
+- 앱 릴리스 체크리스트 **v1**(A-1~A-9): 스킴 `.live` / ATS 예외 0 / Privacy 라벨 / Sentry release / 심사 노트(녹음 동의 스크린샷, 테스트 계정) / Accessibility Inspector / 스냅샷 전부 초록 / 양 플랫폼 빌드 번호 일치 / 계약 해시 일치.
+- **앱 릴리스 체크리스트 v2 (2026-09-21, QA §6 + FD 반영)** — v1 9항목 유지 + 아래. 증거는 `docs/qa/releases/v1.0.md`에 링크.
+  | # | 항목 | REQ / FD | 증거 |
+  |---|---|---|---|
+  | A-10 | `Project.swift` deploymentTargets = iOS 17.0 / macOS 14.0 전 타깃, Domain watchOS 10.0 | REQ-02 / FD-1 | `grep -c '"17.0"'` |
+  | A-11 | 야간 매트릭스 최근 실행 초록: **iOS 17.0 SE 시뮬 스냅샷**(단위·스냅샷·Maestro), **iPad 11"/13" 세로·가로·Split 1/2 매트릭스**, Mac 6K, reduceMotion, Domain watchOS 빌드 | REQ-02·03 / FD-1·2·9 | `app-nightly` run |
+  | A-12 | **macOS 검증 분리**: 11/6 릴리스는 iOS·iPad만 → macOS 14 self-hosted 빌드 초록까지. macOS 14 VM 스모크(로그인→해석→복습 3흐름, 20분)·Mac 접근성 감사·Mac TestFlight은 **11/13 `app/v1.0.1`** 체크리스트, 커밋 해시 = `app/v1.0.0` | REQ-01·02 / FD-8 | 두 태그 해시 |
+  | A-13 | `#available` 분기마다 폴백 테스트(분기 목록 = 테스트 목록 diff 0) | REQ-02 / FD-1 | `scripts/available-audit.sh` |
+  | A-14 | SwiftLint 3규칙 error, disable 주석 목록 검토(각각 이유) | REQ-03·22 / FD-2·10 | lint 로그 |
+  | A-15 | **원문 무유출 테스트**: 카나리 4종 초록 + Sentry debug view 최근 이벤트 10개 육안 + 옵트인 OFF 계정으로 해석 시 외부 호출 0 로그 | REQ-14 / FD-4 | 스크린샷 |
+  | A-16 | Amplitude debug view 이벤트 6개 속성 allowlist 밖 0, autocapture OFF 확인 | REQ-31 / FD-8 | 스크린샷 |
+  | A-17 | Sentry 한도 < 50%(5k/월), Amplitude MTU < 50%(10k) | REQ-11 | 대시보드 |
+  | A-18 | 평가셋 200문장 점수표 baseline 이상, `eval/scores/`에 커밋(실측 usage는 비공개) | REQ-10·12 / FD-5 | 리포트 |
+  | A-19 | `eval/cost_model.py` 입력(단가·평균 토큰·온디바이스 비율)이 이번 릴리스 실측으로 갱신, `make cost MAU=1000` 표 | REQ-13 / FD-6 | PR |
+  | A-20 | 접근성 감사 `performAccessibilityAudit` iOS 26·iOS 17.0(·macOS는 11/13) + Inspector 수동, AX5 잘림 0 | REQ-03 | 야간 run |
+  | A-21 | 바뀐 구조·흐름의 archify JSON+PNG 갱신, `validate` 통과 | REQ-24 / FD-10 | `docs/diagrams/` diff |
+  | A-22 | 새 도구·SDK마다 ADR(의도→비용→대안→왜) 존재 | REQ-20 | `docs/adr/` |
+  | A-23 | 커밋 로그 AI 공동 저자 0건, gitleaks 초록 | REQ-27 | `git log --grep` |
+  | A-24 | 알림 payload가 `contracts/push-payload.schema.json`·예시 4개와 일치, body에 원문·할 일 문장 없음 | REQ-04·14 / FD-3 | jsonschema job |
+  | A-25 | **AI 옵트인 고지문**(A-09) 스크린샷·문구가 심사 노트·Privacy 라벨("제3자 AI, 옵트인")과 일치, 기본 OFF | REQ-14 / FD-4 | 심사 자료 |
+  | A-26 | 베타 그룹 ≤ 50명, 무료 RPD 소진 MAU(`cost_model`) 대비 여유 | REQ-11 / FD-10 | ASC |
+- 서버 릴리스 체크리스트: 마이그레이션 왕복 / schemathesis 초록 / 백업 최신(**암호화, 복구 후 로컬 덤프 shred**) / 롤백 이미지 태그 기록 / 런북 링크 / **S-6** 프라이버시 카나리(로그·Sentry) 초록 / **S-7** schemathesis `|| true` 제거 상태 / **S-8** EngineRouter 브레이커·한도 테스트·평가셋 통과, prod 사슬에 유료 어댑터 없음 / **S-9** trivy CRITICAL 0 / **S-10** `X-Request-Id`로 앱 Sentry 이벤트 1건을 서버 로그와 실제 연결한 기록.
 - 핫픽스: `main`에서 바로 태그(`v1.2.1`), 같은 파이프라인.
 
 ---
@@ -112,7 +141,7 @@ tag server/v* ──▶ 위 전부 ──▶ prod 배포 (수동 승인 environm
 
 - 에러: Sentry(앱·서버 같은 조직, release 연결). 서버는 요청 ID를 응답 헤더 `X-Request-Id`로 돌려주고 앱 Sentry 이벤트에 붙인다 → 앱 크래시와 서버 로그를 한 ID로 잇는다.
 - 로그: 서버 구조화 JSON(요청 ID, userId 해시, operationId, 지연). **원문·받아쓰기·오디오는 로그 금지**(앱 §10 불변식과 동일).
-- 지표: `/metrics`(Prometheus) → Grafana 무료 클라우드. 대시보드 4개: 요청 지연 p50/p95, AI 호출 지연·실패율, 녹음 파이프라인 단계별 소요, 알림 발송 성공률.
+- 지표: `/metrics`(Prometheus) → Grafana 무료 클라우드. 대시보드 **v1.0 2개**(크래시율·요청 지연 p95; 개정 2026-09-21 FD-8), v1.1 4개: 요청 지연 p50/p95, AI 호출 지연·실패율·`ai_quota_remaining`·브레이커 상태, 녹음 파이프라인 단계별 소요·`arq_queue_depth`, 알림 발송 성공률. `usage_daily`는 MySQL 데이터소스로 직접(14번 §19).
 - 알림(온콜): Sentry 알림 + Grafana 임계치(5xx > 1%, AI 실패율 > 5%, 큐 적체 > 100) → 슬랙.
 - 런북: `runbooks/` 폴더에 "AI 장애", "STT 장애", "DB 복구", "롤백" 4개. 각 1쪽.
 

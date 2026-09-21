@@ -1,0 +1,260 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "해석 요청 AI 라우팅 v1.0 (FD-4·FD-5, ADR-0007·0008)",
+    "quality_profile": "showcase",
+    "visual_preset": "blueprint",
+    "views": [
+      {
+        "id": "happy",
+        "label": "옵트인 사용자의 정상 경로",
+        "focus": [
+          "req",
+          "dict",
+          "gate",
+          "gemini",
+          "verify",
+          "store",
+          "result"
+        ],
+        "note": "사전이 먼저, AI는 한 번 호출로 4필드, 서버가 다시 사전으로 덮어쓰고 인덱스를 재계산한다."
+      },
+      {
+        "id": "degrade",
+        "label": "미동의·한도 초과 → 간이 해석",
+        "focus": [
+          "gate",
+          "none",
+          "verify",
+          "result"
+        ],
+        "note": "외부 전송 0. 앱은 '간이 해석' 배지를 붙인다."
+      },
+      {
+        "id": "ondevice",
+        "label": "Foundation Models 미리보기 (조건부)",
+        "focus": [
+          "req",
+          "fm",
+          "result"
+        ],
+        "note": "26+ 기기, S2 평가 통과 시에만 v1.0. 정본은 항상 서버 결과."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "app",
+      "label": "앱 (iPhone·iPad·Mac)"
+    },
+    {
+      "id": "server",
+      "label": "서버 decode 라우터"
+    },
+    {
+      "id": "engine",
+      "label": "외부 엔진"
+    },
+    {
+      "id": "fallback",
+      "label": "강등 경로",
+      "variant": "exception"
+    }
+  ],
+  "phases": [
+    {
+      "id": "in",
+      "label": "요청",
+      "fromCol": 0,
+      "toCol": 1
+    },
+    {
+      "id": "route",
+      "label": "게이트·엔진",
+      "fromCol": 2,
+      "toCol": 3,
+      "variant": "emphasis"
+    },
+    {
+      "id": "out",
+      "label": "검증·저장",
+      "fromCol": 4,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "req",
+    "dict",
+    "gate",
+    "gemini",
+    "verify",
+    "store",
+    "result"
+  ],
+  "nodes": [
+    {
+      "id": "req",
+      "lane": "app",
+      "col": 0,
+      "type": "frontend",
+      "label": "해석 요청",
+      "sublabel": "X-Mw-AI-Consent 헤더",
+      "width": 140
+    },
+    {
+      "id": "fm",
+      "lane": "app",
+      "col": 3,
+      "type": "frontend",
+      "label": "FM 미리보기",
+      "sublabel": "26+, ≤500자",
+      "tag": "조건부 v1.0",
+      "width": 140
+    },
+    {
+      "id": "result",
+      "lane": "app",
+      "col": 5,
+      "type": "frontend",
+      "label": "결과 표시",
+      "sublabel": "정본 = 서버",
+      "width": 140
+    },
+    {
+      "id": "dict",
+      "lane": "server",
+      "col": 1,
+      "type": "database",
+      "label": "검수 사전 매칭",
+      "sublabel": "사전이 AI보다 우선",
+      "width": 140
+    },
+    {
+      "id": "gate",
+      "lane": "server",
+      "col": 2,
+      "type": "security",
+      "label": "옵트인·한도 게이트",
+      "sublabel": "Redis RPD + 피크 RPM",
+      "width": 140
+    },
+    {
+      "id": "verify",
+      "lane": "server",
+      "col": 4,
+      "type": "backend",
+      "label": "사전 덮어쓰기",
+      "sublabel": "인덱스 재계산",
+      "width": 140
+    },
+    {
+      "id": "store",
+      "lane": "server",
+      "col": 5,
+      "type": "database",
+      "label": "저장 + ai_usage",
+      "sublabel": "aiModel = track/model#p",
+      "width": 140
+    },
+    {
+      "id": "gemini",
+      "lane": "engine",
+      "col": 3,
+      "type": "external",
+      "label": "gemini_free",
+      "sublabel": "1회 호출, 4필드 JSON",
+      "width": 140
+    },
+    {
+      "id": "none",
+      "lane": "fallback",
+      "col": 3,
+      "type": "backend",
+      "label": "none/dictionary",
+      "sublabel": "규칙 기반 간이 해석",
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "from": "req",
+      "to": "dict",
+      "label": "원문(우리 서버)"
+    },
+    {
+      "from": "dict",
+      "to": "gate"
+    },
+    {
+      "from": "gate",
+      "to": "gemini",
+      "label": "옵트인 ∧ 한도 내",
+      "variant": "emphasis"
+    },
+    {
+      "from": "gate",
+      "to": "none",
+      "label": "미동의 ∨ 초과 ∨ 장애",
+      "variant": "dashed"
+    },
+    {
+      "from": "gemini",
+      "to": "verify"
+    },
+    {
+      "from": "none",
+      "to": "verify",
+      "variant": "dashed"
+    },
+    {
+      "from": "verify",
+      "to": "store"
+    },
+    {
+      "from": "store",
+      "to": "result"
+    },
+    {
+      "from": "req",
+      "to": "fm",
+      "label": "26+ 즉시",
+      "variant": "dashed"
+    },
+    {
+      "from": "fm",
+      "to": "result",
+      "label": "미리보기",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "불변식 (REQ-14)",
+      "items": [
+        "원문은 우리 서버까지만. 외부 엔진은 옵트인 사용자만",
+        "오디오는 서버 whisper_local, 외부 전송 0",
+        "로그·Sentry·Amplitude·ai_usage에 원문 없음"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "강등 조건",
+      "items": [
+        "미동의 사용자",
+        "무료 한도(RPD·RPM) 초과",
+        "circuit breaker 열림"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "측정",
+      "items": [
+        "호출마다 엔진·토큰·지연 기록",
+        "일 배치 usage_daily → eval/cost_model.py",
+        "평가셋 200문장으로만 라우팅 변경"
+      ]
+    }
+  ]
+}

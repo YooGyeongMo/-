@@ -1,0 +1,264 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "뭔말인교? 앱 모듈 그래프 (Tuist 8모듈, ADR-0001)",
+    "quality_profile": "showcase",
+    "visual_preset": "blueprint",
+    "viewBox": [
+      1040,
+      600
+    ],
+    "views": [
+      {
+        "id": "core",
+        "label": "핵심: Domain은 아무것도 모른다",
+        "focus": [
+          "domain",
+          "data",
+          "presentation"
+        ],
+        "note": "Domain은 SwiftUI·네트워크·플랫폼 의존이 0. watchOS 데스티네이션 후보(REQ-04)."
+      },
+      {
+        "id": "edges",
+        "label": "바깥 고리: API·Platform·SDK",
+        "focus": [
+          "api",
+          "platform",
+          "ui",
+          "data"
+        ],
+        "note": "생성 코드·OS 프레임워크·디자인 SDK는 Data/Presentation 뒤에 숨는다."
+      },
+      {
+        "id": "compose",
+        "label": "조립: Navigation → Composition → 앱",
+        "focus": [
+          "navigation",
+          "composition",
+          "apps"
+        ],
+        "note": "탭당 경로 하나([AppRoute]), 흐름 코디네이터는 팩토리."
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "apps",
+      "type": "frontend",
+      "label": "MwonmalIOS · MwonmalMac",
+      "sublabel": "iPhone·iPad·Mac 앱 + UICatalog",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        260,
+        70
+      ]
+    },
+    {
+      "id": "composition",
+      "type": "backend",
+      "label": "Composition",
+      "sublabel": "DI 조립, 환경 스킴",
+      "pos": [
+        40,
+        180
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "navigation",
+      "type": "backend",
+      "label": "Navigation",
+      "sublabel": "TabCoordinator, [AppRoute] 탭당 1",
+      "pos": [
+        40,
+        320
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "presentation",
+      "type": "frontend",
+      "label": "Presentation",
+      "sublabel": "흐름 8 · ViewModel · Contracts",
+      "pos": [
+        400,
+        320
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "ui",
+      "type": "frontend",
+      "label": "MwonmalUI (SDK)",
+      "sublabel": "토큰·컴포넌트·Motion(REQ-22)",
+      "pos": [
+        400,
+        480
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "domain",
+      "type": "database",
+      "label": "Domain",
+      "sublabel": "Entity·Rules·UseCase 28·프로토콜",
+      "pos": [
+        400,
+        180
+      ],
+      "size": [
+        260,
+        64
+      ]
+    },
+    {
+      "id": "data",
+      "type": "backend",
+      "label": "Data",
+      "sublabel": "Repository, DomainError 30코드",
+      "pos": [
+        760,
+        180
+      ],
+      "size": [
+        240,
+        64
+      ]
+    },
+    {
+      "id": "api",
+      "type": "external",
+      "label": "MwonmalAPI",
+      "sublabel": "yml 생성 코드 + 미들웨어 3",
+      "pos": [
+        760,
+        40
+      ],
+      "size": [
+        240,
+        64
+      ]
+    },
+    {
+      "id": "platform",
+      "type": "security",
+      "label": "Platform",
+      "sublabel": "Speech·Vision·OAuth·Push·Keychain",
+      "pos": [
+        760,
+        320
+      ],
+      "size": [
+        240,
+        80
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "apps/ios-macos (Tuist 정적 프레임워크)",
+      "wraps": [
+        "apps",
+        "composition",
+        "navigation",
+        "presentation",
+        "ui",
+        "domain",
+        "data",
+        "api",
+        "platform"
+      ],
+      "pad": 22
+    },
+    {
+      "kind": "security-group",
+      "label": "Presentation에서 import 금지 (SwiftLint)",
+      "wraps": [
+        "data",
+        "api",
+        "platform"
+      ],
+      "pad": 12
+    }
+  ],
+  "connections": [
+    {
+      "id": "apps-composition",
+      "from": "apps",
+      "to": "composition",
+      "variant": "emphasis"
+    },
+    {
+      "id": "composition-navigation",
+      "from": "composition",
+      "to": "navigation",
+      "variant": "emphasis"
+    },
+    {
+      "id": "navigation-presentation",
+      "from": "navigation",
+      "to": "presentation",
+      "label": "흐름 팩토리",
+      "variant": "emphasis",
+      "labelDy": -12
+    },
+    {
+      "id": "presentation-domain",
+      "from": "presentation",
+      "to": "domain",
+      "label": "UseCase",
+      "variant": "emphasis",
+      "labelDy": -24
+    },
+    {
+      "id": "presentation-ui",
+      "from": "presentation",
+      "to": "ui",
+      "label": "표시 모델만",
+      "variant": "emphasis",
+      "labelDy": 24
+    },
+    {
+      "id": "data-domain",
+      "from": "data",
+      "to": "domain",
+      "label": "프로토콜 구현",
+      "variant": "emphasis",
+      "labelDy": -12
+    },
+    {
+      "id": "data-api",
+      "from": "data",
+      "to": "api",
+      "label": "생성 Client",
+      "variant": "emphasis",
+      "labelDy": -24
+    },
+    {
+      "id": "platform-domain",
+      "from": "platform",
+      "to": "domain",
+      "label": "프로토콜 구현",
+      "variant": "security",
+      "labelDy": -12
+    }
+  ]
+}

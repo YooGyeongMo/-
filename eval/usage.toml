@@ -1,0 +1,18 @@
+# eval/usage.toml — 1인당 월 사용량 **가정** (REQ-13 "수치는 측정값으로 갱신")
+# source = "assumption" | "measured". measured 파일은 eval/usage_snapshot.py 가 서버 usage_daily 에서 생성해
+# eval/measured/usage.toml 로 둔다(.gitignore, 비공개 — 사용자 결정). 서버 DB 가 진실, Amplitude 는 행동 지표.
+source = "assumption"
+period = ""                   # measured 일 때 "YYYY-MM"
+
+[per_user_month]
+translations = 30             # 텍스트 해석 요청 (근무일 20일 × 1.5건)
+meeting_decodes = 4           # 주 1회 회의 녹음 → 해석
+recording_minutes = 120       # 4회 × 30분
+reviews = 12                  # 복습 세션 (AI 비용 0, 서버 부하만)
+dictionary_only_rate = 0.10   # 사전만으로 끝나 AI 를 안 부른 비율
+cache_hit_rate = 0.20         # 같은 문장 10분 재사용 캐시 적중률
+ondevice_rate = 0.0           # v1.0 = 0 (온디바이스는 미리보기, 정본은 서버 — FD-5). v1.1 clientHints 이후 갱신. 한 번만 적용(RT-B-14)
+long_meeting_rate = 0.25      # 5000자 초과로 요약이 먼저 도는 회의 비율
+
+[peak]
+factor = 5.0                  # 피크 RPM / 하루 평균 RPM (퇴근길 18~19시 몰림 가정, RT-B-08)
