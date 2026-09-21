@@ -54,7 +54,7 @@ jobs:
       - run: cd apps/ios-macos && tuist install && tuist generate --no-open
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation test
-      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalIOS -destination 'platform=iOS Simulator,name=iPhone 17,OS=26.4' -skipPackagePluginValidation test
+      - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalIOS -destination 'platform=iOS Simulator,name=iPhone 17,OS=latest' -skipPackagePluginValidation test
   nightly:
     # Tier2 (ADR-0011 / FD-9): 최소 OS iOS 17.0 시뮬레이터(iPhone SE 3세대) 단위 테스트. hosted 이미지엔 17.0 런타임이 없어
     # self-hosted 러너(iOS 17.0 런타임·Xcode 26.4 사전 설치)에서만 돈다. fork PR 코드 실행 금지 → pull_request 제외.
