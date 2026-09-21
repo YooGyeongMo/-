@@ -1,0 +1,20 @@
+{
+  "aps": {
+    "alert": { "title": "30분 뒤 마감", "body": "할 일 1건이 곧 마감돼요" },
+    "sound": "default",
+    "category": "ACTION_DUE",
+    "thread-id": "meeting:12",
+    "interruption-level": "time-sensitive",
+    "relevance-score": 0.9
+  },
+  "mw": {
+    "v": 1,
+    "type": "ACTION_DUE",
+    "deepLink": "mwonmal://actions/5001?notificationId=9002",
+    "notificationId": 9002,
+    "projectId": 7,
+    "meetingId": 12,
+    "translationId": 1024,
+    "actionId": 5001
+  }
+}

@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mwonmal.kr/contracts/push-payload.schema.json",
+  "title": "PushPayload v1",
+  "description": "APNs 알림 payload 단일 스키마 (FD-3 / ADR-0010, REQ-04). aps.alert 에는 제목·개수만 — 할 일 문장·원문·받아쓰기·해석 결과는 절대 넣지 않는다(RT-A-03·B-19). mw.deepLink 가 유일한 행동 계약이며 iPhone·iPad·Mac·워치(v2)가 같은 DeepLink(Domain) 파서를 쓴다. 전체 4KB 이하.",
+  "type": "object",
+  "required": ["aps", "mw"],
+  "additionalProperties": false,
+  "properties": {
+    "aps": {
+      "type": "object",
+      "required": ["alert", "category", "thread-id"],
+      "additionalProperties": false,
+      "properties": {
+        "alert": {
+          "type": "object",
+          "required": ["title", "body"],
+          "additionalProperties": false,
+          "properties": {
+            "title": { "type": "string", "minLength": 1, "maxLength": 40 },
+            "body": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80,
+              "description": "고정 문구 + 개수 + (TRANSLATION_DONE 한정) meetings.title 만. actionText·sourceText·resultText·transcript 금지 — 빌더 단위 테스트로 고정"
+            }
+          }
+        },
+        "category": { "$ref": "#/$defs/NotificationType", "description": "iOS 알림 액션 카테고리 = type 과 동일" },
+        "thread-id": { "type": "string", "pattern": "^(review|level|meeting:[0-9]+|translation:[0-9]+)$" },
+        "sound": { "type": "string", "default": "default" },
+        "badge": { "type": "integer", "minimum": 0 },
+        "interruption-level": { "type": "string", "enum": ["passive", "active", "time-sensitive"] },
+        "relevance-score": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "mw": {
+      "type": "object",
+      "required": ["v", "type", "deepLink", "notificationId"],
+      "additionalProperties": false,
+      "properties": {
+        "v": { "type": "integer", "const": 1, "description": "payload 스키마 버전" },
+        "type": { "$ref": "#/$defs/NotificationType" },
+        "deepLink": {
+          "type": "string",
+          "pattern": "^mwonmal://[a-z][a-z0-9/_-]*(\\?[A-Za-z0-9_=&%-]*)?$",
+          "maxLength": 200,
+          "description": "유일한 행동 계약. Domain.DeepLink.parse 가 해석. 쿼리에 텍스트 금지(ID·숫자만)"
+        },
+        "notificationId": { "$ref": "#/$defs/Id64", "description": "notifications.id — 열림 추적·중복 제거" },
+        "projectId": { "$ref": "#/$defs/Id64" },
+        "meetingId": { "$ref": "#/$defs/Id64" },
+        "translationId": { "$ref": "#/$defs/Id64" },
+        "actionId": { "$ref": "#/$defs/Id64" },
+        "quizId": { "$ref": "#/$defs/Id64" },
+        "dueCount": { "type": "integer", "minimum": 0, "description": "REVIEW_DUE: 오늘 복습할 카드 수" }
+      },
+      "allOf": [
+        { "if": { "properties": { "type": { "const": "REVIEW_DUE" } } }, "then": { "required": ["dueCount"] } },
+        { "if": { "properties": { "type": { "const": "ACTION_DUE" } } }, "then": { "required": ["actionId", "translationId"] } },
+        { "if": { "properties": { "type": { "const": "TRANSLATION_DONE" } } }, "then": { "required": ["translationId"] } },
+        { "if": { "properties": { "type": { "const": "LEVEL_UP" } } }, "then": { "required": ["quizId"] } }
+      ]
+    }
+  },
+  "$defs": {
+    "NotificationType": { "type": "string", "enum": ["REVIEW_DUE", "ACTION_DUE", "TRANSLATION_DONE", "LEVEL_UP"] },
+    "Id64": { "type": "integer", "minimum": 1, "maximum": 9223372036854775807 }
+  }
+}

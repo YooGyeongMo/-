@@ -1,0 +1,19 @@
+{
+  "aps": {
+    "alert": { "title": "해석이 끝났어요", "body": "스프린트 계획 회의 · 판교어 4개, 할 일 2개" },
+    "sound": "default",
+    "category": "TRANSLATION_DONE",
+    "thread-id": "meeting:12",
+    "interruption-level": "active",
+    "relevance-score": 0.8
+  },
+  "mw": {
+    "v": 1,
+    "type": "TRANSLATION_DONE",
+    "deepLink": "mwonmal://translations/2048?notificationId=9003",
+    "notificationId": 9003,
+    "projectId": 7,
+    "meetingId": 12,
+    "translationId": 2048
+  }
+}

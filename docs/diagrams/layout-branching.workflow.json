@@ -1,0 +1,217 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "레이아웃 분기와 상태 보존 (FD-2, ADR-0006)",
+    "quality_profile": "showcase",
+    "visual_preset": "blueprint",
+    "views": [
+      {
+        "id": "axis",
+        "label": "분기 축은 사이즈 클래스",
+        "focus": [
+          "sizeclass",
+          "split",
+          "tab"
+        ],
+        "note": "플랫폼이 아니라 horizontal·vertical 둘 다 .regular인지로 나눈다. Mac은 항상 regular."
+      },
+      {
+        "id": "state",
+        "label": "상태는 TabCoordinator 하나",
+        "focus": [
+          "detail3",
+          "stack",
+          "coord",
+          "rebuild"
+        ],
+        "note": "루트가 바뀌어도 탭별 [AppRoute]는 그대로. 세 열은 detail 라우트 안에서 그린다."
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "env",
+      "label": "환경 (SwiftUI Environment)"
+    },
+    {
+      "id": "wide",
+      "label": "넓은 레이아웃 · Mac, iPad 전체화면·Split 1/2"
+    },
+    {
+      "id": "compact",
+      "label": "좁은 레이아웃 · iPhone, iPad Slide Over·1/3"
+    },
+    {
+      "id": "state",
+      "label": "Navigation 모듈 상태"
+    }
+  ],
+  "phases": [
+    {
+      "id": "read",
+      "label": "읽기",
+      "fromCol": 0,
+      "toCol": 0
+    },
+    {
+      "id": "root",
+      "label": "루트 선택 (Navigation.AdaptiveRoot)",
+      "fromCol": 1,
+      "toCol": 2,
+      "variant": "emphasis"
+    },
+    {
+      "id": "keep",
+      "label": "상태 보존",
+      "fromCol": 3,
+      "toCol": 5
+    }
+  ],
+  "mainPath": [
+    "sizeclass",
+    "split",
+    "detail3",
+    "coord",
+    "rebuild",
+    "deep"
+  ],
+  "nodes": [
+    {
+      "id": "sizeclass",
+      "lane": "env",
+      "col": 0,
+      "type": "frontend",
+      "label": "sizeClass 읽기",
+      "sublabel": "horizontal + vertical",
+      "width": 140
+    },
+    {
+      "id": "rebuild",
+      "lane": "env",
+      "col": 4,
+      "type": "frontend",
+      "label": "클래스 변경",
+      "sublabel": "멀티태스킹·창 크기",
+      "width": 140
+    },
+    {
+      "id": "split",
+      "lane": "wide",
+      "col": 1,
+      "type": "frontend",
+      "label": "NavigationSplitView",
+      "sublabel": "사이드바 + detail 2열",
+      "width": 140
+    },
+    {
+      "id": "detail3",
+      "lane": "wide",
+      "col": 2,
+      "type": "frontend",
+      "label": "세 열은 라우트 안",
+      "sublabel": "detail 내부 HStack",
+      "width": 140
+    },
+    {
+      "id": "tab",
+      "lane": "compact",
+      "col": 1,
+      "type": "frontend",
+      "label": "TabView",
+      "sublabel": "sidebarAdaptable 미사용",
+      "width": 140
+    },
+    {
+      "id": "stack",
+      "lane": "compact",
+      "col": 2,
+      "type": "frontend",
+      "label": "NavigationStack",
+      "sublabel": "탭마다 하나",
+      "width": 140
+    },
+    {
+      "id": "coord",
+      "lane": "state",
+      "col": 3,
+      "type": "backend",
+      "label": "TabCoordinator",
+      "sublabel": "탭별 [AppRoute] 소유",
+      "tag": "@Observable",
+      "width": 140
+    },
+    {
+      "id": "deep",
+      "lane": "state",
+      "col": 5,
+      "type": "backend",
+      "label": "딥링크 4종",
+      "sublabel": "조상 경로 복원",
+      "width": 140
+    }
+  ],
+  "edges": [
+    {
+      "from": "sizeclass",
+      "to": "split",
+      "label": "regular × regular",
+      "variant": "emphasis"
+    },
+    {
+      "from": "sizeclass",
+      "to": "tab",
+      "label": "그 외",
+      "variant": "dashed"
+    },
+    {
+      "from": "split",
+      "to": "detail3"
+    },
+    {
+      "from": "tab",
+      "to": "stack"
+    },
+    {
+      "from": "detail3",
+      "to": "coord",
+      "label": "경로 바인딩"
+    },
+    {
+      "from": "stack",
+      "to": "coord",
+      "label": "경로 바인딩",
+      "variant": "dashed"
+    },
+    {
+      "from": "coord",
+      "to": "rebuild",
+      "label": "루트만 교체, 경로 유지",
+      "variant": "emphasis"
+    },
+    {
+      "from": "rebuild",
+      "to": "deep"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "규칙",
+      "items": [
+        "창 폭 하드코딩 금지 (iPadOS 26 창 모드)",
+        "AdaptiveRoot는 Navigation 모듈 (MwonmalUI는 Navigation을 모름)",
+        "@SceneStorage는 v1.1 (Visibility는 RawRepresentable 아님)"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "검증",
+      "items": [
+        "NavigationTests: 두 루트에서 같은 paths 동작",
+        "스냅샷: iPad Split 1/2·1/3, Mac 1000×700·6K",
+        "iOS 17.0 시뮬 Tier2 야간"
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # ADR-0002: CI/CD는 GitHub Actions(+ self-hosted macOS 러너)로, Jenkins는 쓰지 않는다
 
-- 상태: 채택 (2026-09-19)
+- 상태: 채택 (2026-09-19) — §결정·§결과의 러너 전략("self-hosted 우선, `macos-15` 폴백")은 **ADR-0011로 대체**(2026-09-21). "GitHub Actions, Jenkins 안 씀"은 유지.
 - 관련: 설계 13번 §5, 이슈 #1
 
 ## 맥락

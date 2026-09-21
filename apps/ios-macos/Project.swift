@@ -3,6 +3,11 @@ import ProjectDescription
 /// 모듈 그래프 (설계 12번 §0). 의존 방향 위반은 생성 단계에서 실패한다.
 /// Composition → Navigation → Presentation → Domain
 /// Presentation → MwonmalUI ; Data → Domain, MwonmalAPI, Platform ; Platform → Domain
+/// REQ-02 / FD-1 / ADR-0005: 최소 iOS 17.0 · macOS 14.0. 18·26 전용 API 게이트는 Platform · MwonmalUI/Compat · Composition/AppContainer 세 곳만.
+let minimumOS: DeploymentTargets = .multiplatform(iOS: "17.0", macOS: "14.0")
+/// FD-10 / ADR-0001 개정: Domain(의존성 0)만 watchOS 10.0 데스티네이션을 추가한다. v2 워치 앱이 DeepLink·StreakStatus를 공유하기 위함.
+let domainOS: DeploymentTargets = .multiplatform(iOS: "17.0", macOS: "14.0", watchOS: "10.0")
+
 let unitTests: [TestableTarget] = [
     "DomainTests",
     "MwonmalUITests",
@@ -22,10 +27,10 @@ let project = Project(
     targets: [
         .target(
             name: "Domain",
-            destinations: [.iPhone, .iPad, .mac],
+            destinations: [.iPhone, .iPad, .mac, .appleWatch],
             product: .staticFramework,
             bundleId: "kr.mwonmal.domain",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: domainOS,
             sources: ["Modules/Domain/Sources/**"],
             resources: nil,
             dependencies: []
@@ -35,7 +40,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.domain.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Domain/Tests/**"],
             dependencies: [.target(name: "Domain")]
         ),
@@ -44,7 +49,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.mwonmalui",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/MwonmalUI/Sources/**"],
             resources: ["Modules/MwonmalUI/Resources/**"],
             dependencies: []
@@ -54,7 +59,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.mwonmalui.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/MwonmalUI/Tests/**"],
             dependencies: [.target(name: "MwonmalUI")]
         ),
@@ -63,7 +68,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.mwonmalapi",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/MwonmalAPI/Sources/**"],
             resources: nil,
             dependencies: []
@@ -73,7 +78,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.mwonmalapi.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/MwonmalAPI/Tests/**"],
             dependencies: [.target(name: "MwonmalAPI")]
         ),
@@ -82,7 +87,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.platform",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Platform/Sources/**"],
             resources: nil,
             dependencies: [.target(name: "Domain")]
@@ -92,7 +97,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.platform.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Platform/Tests/**"],
             dependencies: [.target(name: "Platform")]
         ),
@@ -101,7 +106,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.data",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Data/Sources/**"],
             resources: nil,
             dependencies: [.target(name: "Domain"), .target(name: "MwonmalAPI"), .target(name: "Platform")]
@@ -111,7 +116,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.data.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Data/Tests/**"],
             dependencies: [.target(name: "Data")]
         ),
@@ -120,7 +125,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.presentation",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Presentation/Sources/**"],
             resources: nil,
             dependencies: [.target(name: "Domain"), .target(name: "MwonmalUI")]
@@ -130,7 +135,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.presentation.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Presentation/Tests/**"],
             dependencies: [.target(name: "Presentation")]
         ),
@@ -139,7 +144,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.navigation",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Navigation/Sources/**"],
             resources: nil,
             dependencies: [.target(name: "Presentation"), .target(name: "Domain")]
@@ -149,7 +154,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.navigation.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Navigation/Tests/**"],
             dependencies: [.target(name: "Navigation")]
         ),
@@ -158,7 +163,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
             bundleId: "kr.mwonmal.composition",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Composition/Sources/**"],
             resources: nil,
             dependencies: [
@@ -175,7 +180,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .unitTests,
             bundleId: "kr.mwonmal.composition.tests",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             sources: ["Modules/Composition/Tests/**"],
             dependencies: [.target(name: "Composition")]
         ),
@@ -184,7 +189,7 @@ let project = Project(
             destinations: [.iPhone, .iPad],
             product: .app,
             bundleId: "kr.mwonmal.app",
-            deploymentTargets: .iOS("26.0"),
+            deploymentTargets: .iOS("17.0"),
             infoPlist: .extendingDefault(with: [
                 "UILaunchScreen": [:],
                 "CFBundleDisplayName": "뭔말인교?",
@@ -199,7 +204,7 @@ let project = Project(
             destinations: [.mac],
             product: .app,
             bundleId: "kr.mwonmal.mac",
-            deploymentTargets: .macOS("26.0"),
+            deploymentTargets: .macOS("14.0"),
             infoPlist: .extendingDefault(with: [
                 "CFBundleDisplayName": "뭔말인교?",
                 "NSMicrophoneUsageDescription": "회의를 녹음해 받아쓰기와 해석에 씁니다.",
@@ -214,7 +219,7 @@ let project = Project(
             destinations: [.iPhone, .iPad, .mac],
             product: .app,
             bundleId: "kr.mwonmal.catalog",
-            deploymentTargets: .multiplatform(iOS: "26.0", macOS: "26.0"),
+            deploymentTargets: minimumOS,
             infoPlist: .extendingDefault(with: ["UILaunchScreen": [:]]),
             sources: ["Apps/Catalog/Sources/**"],
             dependencies: [.target(name: "MwonmalUI")]

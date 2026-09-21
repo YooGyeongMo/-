@@ -15,3 +15,42 @@ custom_rules:
     regex: "\\bunowned\\b"
     message: "weak를 쓴다 (설계 D-15)"
     severity: error
+  # ── FD-1 / ADR-0005 (REQ-02): 18·26 전용 API 게이트는 Platform · MwonmalUI/Compat · Composition/AppContainer 세 곳만.
+  no_available_in_core:
+    name: "Presentation·Domain·Navigation에 #available/@available 금지"
+    included:
+      - "apps/ios-macos/Modules/Presentation/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/Domain/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/Navigation/Sources/.*\\.swift"
+    regex: "(#|@)available\\s*\\("
+    excluded_match_kinds: [comment, comment.mark, comment.url, doccomment, doccomment.field, string]
+    message: "OS 버전 게이트는 Platform(구현체 교체)·MwonmalUI/Compat(모디파이어)·Composition/AppContainer(선택)에서만 (ADR-0005)"
+    severity: error
+  # ── FD-2 / ADR-0006 (REQ-03): 고정 높이 금지 → minHeight·ViewThatFits. 아이콘 등 크기는 토큰 상수(MwonmalSize.·MwonmalSpacing.)만.
+  no_fixed_height:
+    name: "frame(height:) 숫자 리터럴 금지"
+    included:
+      - "apps/ios-macos/Modules/Presentation/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/MwonmalUI/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/Navigation/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/Composition/Sources/.*\\.swift"
+    excluded:
+      - "apps/ios-macos/Modules/MwonmalUI/Sources/Tokens/.*\\.swift"
+    regex: "\\.frame\\(\\s*(?:width:\\s*(?:[0-9.]+|Mwonmal(?:Spacing|Size)\\.\\w+)\\s*,\\s*)?height:\\s*(?!Mwonmal(?:Spacing|Size)\\.)[0-9.]+"
+    excluded_match_kinds: [comment, comment.mark, comment.url, doccomment, doccomment.field, string]
+    message: "고정 높이 금지. minHeight 또는 ViewThatFits, 아이콘은 MwonmalSize.* 토큰 (ADR-0006). 예외는 `// swiftlint:disable:next no_fixed_height - <이유>`"
+    severity: error
+  # ── FD-10 / ADR-0012 (REQ-22): 애니메이션 곡선 리터럴은 MwonmalUI/Motion 프리셋에만.
+  no_inline_animation_literal:
+    name: "애니메이션 곡선 리터럴 직접 사용 금지"
+    included:
+      - "apps/ios-macos/Modules/Presentation/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/MwonmalUI/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/Navigation/Sources/.*\\.swift"
+      - "apps/ios-macos/Modules/Composition/Sources/.*\\.swift"
+    excluded:
+      - "apps/ios-macos/Modules/MwonmalUI/Sources/Motion/.*\\.swift"
+    regex: "(?:\\.animation|\\bwithAnimation)\\(\\s*\\.(?:easeIn|easeOut|easeInOut|linear|spring|smooth|snappy|bouncy)\\b"
+    excluded_match_kinds: [comment, comment.mark, comment.url, doccomment, doccomment.field, string]
+    message: "MwonmalMotion 프리셋(cardFlip·decodingPulse·sheetPresent)과 @Entry mwMotion만. 새 곡선은 MwonmalUI/Motion에 추가 (ADR-0012)"
+    severity: error

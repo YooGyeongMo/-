@@ -1,0 +1,5 @@
+# 실측·캐시·모델 파일은 커밋하지 않는다 (FD-5: 실측 비공개 — 사용자 결정)
+measured/
+cache/
+*.gguf
+*.safetensors

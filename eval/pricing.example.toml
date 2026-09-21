@@ -1,0 +1,136 @@
+# eval/pricing.example.toml — **가정값, 사실 아님**. 구조 시연·단위 테스트 전용.
+# 여기 숫자는 어떤 공식 가격표도 인용하지 않았다. 실제 산정은 pricing.toml 을 갱신해서 쓴다.
+# 모든 항목 unverified = true 를 유지한다(리포트 하단에 자리표시자 목록으로 표시됨).
+
+[fx]
+krw_per_usd = 1000            # 가정(계산 검증용 정수)
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[audio]
+mb_per_minute = 1.0
+retention_days = 30
+
+[models.gemini_free]
+provider = "google"
+input_per_mtok = 1.0          # 가정
+cached_input_per_mtok = 0.5   # 가정
+output_per_mtok = 4.0         # 가정
+free_rpd = 200                # 가정
+free_rpm = 10                 # 가정
+over_limit = "fallback"
+fallback_model = "none"
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[models.paid_example]
+provider = "example"
+input_per_mtok = 2.0
+cached_input_per_mtok = 1.0
+output_per_mtok = 8.0
+over_limit = "pay"
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[models.degrade_example]
+provider = "example"
+free_rpd = 100
+over_limit = "degrade"
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[models.none]
+provider = "self"
+input_per_mtok = 0
+cached_input_per_mtok = 0
+output_per_mtok = 0
+over_limit = "pay"
+unverified = false
+verified_on = "2026-09-21"
+source = "docs/council/DECISIONS.md FD-4"
+
+[[stt.chain]]
+name = "whisper_local"
+selfhost = true
+free_sec_per_day = 0
+selfhost_cpu_min_per_audio_min = 2.0   # 가정
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[[stt.chain]]
+name = "external_example"     # 가정: 외부 STT 가 사슬에 있을 때만 (FD-4 현재는 없음)
+free_sec_per_day = 3600
+usd_per_minute = 0.01
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[storage]
+provider = "r2"
+usd_per_gb_month = 0.015      # 가정
+free_gb = 10
+usd_per_million_class_a = 4.5 # 가정
+free_class_a_per_month = 1000000
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[fixed.oci_free]
+usd_per_month = 0
+vcpus = 4                     # 가정
+cpu_utilization_cap = 0.7
+label = "OCI Always Free"
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[fixed.aws_t4g_small]
+usd_per_month = 15            # 가정
+vcpus = 2
+cpu_utilization_cap = 0.7
+label = "AWS t4g.small"
+unverified = true
+verified_on = ""
+source = "assumption"
+
+[tasks.translate]
+input_tokens = 400
+cached_tokens = 2000
+output_tokens = 500
+
+[tasks.meeting]
+input_tokens = 300
+cached_tokens = 1200
+output_tokens = 800
+per_minute_input_tokens = 400
+
+[tasks.summary]
+input_tokens = 200
+cached_tokens = 0
+output_tokens = 1500
+per_minute_input_tokens = 400
+
+[tracks.gemini_free]
+translate = "gemini_free"
+meeting = "gemini_free"
+summary = "gemini_free"
+
+[tracks.none]
+translate = "none"
+meeting = "none"
+summary = "none"
+
+[tracks.paid_example]
+translate = "paid_example"
+meeting = "paid_example"
+summary = "paid_example"
+
+[tracks.degrade_example]
+translate = "degrade_example"
+meeting = "degrade_example"
+summary = "degrade_example"
