@@ -34,29 +34,44 @@ jobs:
       # S0 Day 4에 실제 라우터가 생기면 `|| true` 제거
       - run: (uv run uvicorn app.main:app --port 8080 &) && sleep 3 && uv run schemathesis run http://127.0.0.1:8080/openapi.json --checks all --hypothesis-max-examples=5 --exitfirst || true
   image:
+    # 순서가 중요하다: 빌드 → 스캔 → (main 이면) push. 스캔을 통과한 이미지만 레지스트리에 올라간다.
+    # 2026-09-22 개정(이슈: main 만 빨개짐):
+    #  1) 스캔이 push 에서만 돌아 PR 은 항상 초록 → 머지 직후 main 실패. 이제 PR 에서도 돈다.
+    #  2) 베이스 이미지(python:3.12-slim = Debian)의 "수정본 없음(affected)" CVE 로 실패했다.
+    #     우리가 손쓸 수 없는 취약점으로 파이프라인을 막지 않는다 → ignore-unfixed.
+    #     수정본이 나온 CVE 는 그대로 막는다(베이스 이미지 갱신으로 해결 가능하므로).
+    #  3) trivy-action@master 는 움직이는 표적이라 버전 고정. DB 는 ghcr 우선, mirror.gcr.io 폴백
+    #     (2026-09-19 실패 원인 = mirror.gcr.io BLOB_UNKNOWN).
     runs-on: ubuntu-latest
     needs: test
     permissions:
       contents: read
       packages: write
+    env:
+      IMAGE: ghcr.io/yoogyeongmo/mwonmal-api:${{ github.sha }}
     steps:
       - uses: actions/checkout@v4
       - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/api/Dockerfile
+          load: true
+          push: false
+          tags: ${{ env.IMAGE }}
+      - uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_DB_REPOSITORY: "ghcr.io/aquasecurity/trivy-db:2,mirror.gcr.io/aquasec/trivy-db:2"
+        with:
+          image-ref: ${{ env.IMAGE }}
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
       - uses: docker/login-action@v3
         if: github.event_name == 'push'
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - uses: docker/build-push-action@v6
-        with:
-          context: .
-          file: services/api/Dockerfile
-          push: ${{ github.event_name == 'push' }}
-          tags: ghcr.io/yoogyeongmo/mwonmal-api:${{ github.sha }}
-      - uses: aquasecurity/trivy-action@master
+      - run: docker push "$IMAGE"
         if: github.event_name == 'push'
-        with:
-          image-ref: ghcr.io/yoogyeongmo/mwonmal-api:${{ github.sha }}
-          severity: CRITICAL,HIGH
-          exit-code: "1"

@@ -58,7 +58,14 @@ jobs:
   nightly:
     # Tier2 (ADR-0011 / FD-9): 최소 OS iOS 17.0 시뮬레이터(iPhone SE 3세대) 단위 테스트. hosted 이미지엔 17.0 런타임이 없어
     # self-hosted 러너(iOS 17.0 런타임·Xcode 26.4 사전 설치)에서만 돈다. fork PR 코드 실행 금지 → pull_request 제외.
-    if: github.event_name != 'pull_request'
+    #
+    # 2026-09-22 개정(이슈: 이 job 이 영원히 queued 로 남아 run 전체를 오염시킴):
+    #  - `!= 'pull_request'` 는 push(main) 에서도 참이라 머지마다 60분짜리 Tier2 가 붙었다 → schedule·수동만.
+    #  - 아직 등록된 self-hosted 러너가 0대라 job 이 러너를 못 찾고 큐에 머문다. 저장소 변수
+    #    `SELF_HOSTED_MAC=true` 가 있을 때만 켠다. 러너를 붙인 뒤 켜는 법:
+    #      gh variable set SELF_HOSTED_MAC --body true --repo YooGyeongMo/-
+    #    (러너는 개발 Mac 의 별도 macOS 계정 + ephemeral. ADR-0011 / RT-B-20)
+    if: (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && vars.SELF_HOSTED_MAC == 'true'
     runs-on: [self-hosted, macOS]
     timeout-minutes: 60
     steps:
