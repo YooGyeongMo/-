@@ -2,6 +2,10 @@ name: contracts
 on:
   pull_request:
     paths: ["contracts/**", ".github/workflows/contracts.yml"]
+  push:
+    branches: [main]
+    paths: ["contracts/**", ".github/workflows/contracts.yml"]
+  workflow_dispatch:
 jobs:
   validate:
     runs-on: ubuntu-latest
