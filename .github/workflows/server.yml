@@ -3,8 +3,10 @@ on:
   pull_request:
     paths: ["services/**", "packages/**", "contracts/**", "infra/**", ".github/workflows/server.yml"]
   push:
+    # 워크플로 자신도 포함(2026-09-22): 빠져 있으면 CI 수정이 main 에서 검증되지 않는다.
     branches: [main]
-    paths: ["services/**", "packages/**", "contracts/**", "infra/**"]
+    paths: ["services/**", "packages/**", "contracts/**", "infra/**", ".github/workflows/server.yml"]
+  workflow_dispatch:
 concurrency:
   group: server-${{ github.ref }}
   cancel-in-progress: true
