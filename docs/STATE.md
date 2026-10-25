@@ -4,13 +4,13 @@
 > 대화 기록은 길어지면 자동 요약되어 세부가 날아간다. 그래서 중요한 것은 전부 여기와 `docs/` 아래, 그리고 GitHub 이슈에 있다.
 > 세션이 끝날 때마다 이 파일을 갱신한다(`/mw-save`). 새 세션은 `/mw` 로 이 파일부터 읽는다.
 
-**마지막 갱신**: 2026-10-25 · **main**: `ce787a6` · **CI**: server 초록(main, MySQL 8.4 왕복 포함 58 통과)
+**마지막 갱신**: 2026-10-25 · **main**: `198139a` · **CI**: server·secrets 초록(main, 테스트 81 통과·MySQL 포함)
 
 ---
 
 ## 1. 지금 단계 — 한 문장
 
-**롤링 릴리스 확정(ADR-0013).** v1.0 해석 = **2026-11-20(금)**, 평일 하루 3h × 20일. **Day 1 완료(10/25 당겨서, PR #92)** → 다음은 **Day 2(10/27 화) Apple 로그인 서버(#6)**. 10/26(월)은 하루 앞서 있으니 Day 2를 당기거나 #4 잔여(`/levels`·schemathesis `|| true` 제거·`.env.example`)를 한다. 일정의 단일 원본 = `docs/16_실행계획.md` §0.
+**롤링 릴리스 확정(ADR-0013).** v1.0 해석 = **2026-11-20(금)**, 평일 하루 3h × 20일. **Day 1·2 완료(10/25에 당겨서, PR #92·#94)** → 다음은 **Day 3 앱 API 생성(#3)**. 계획보다 2일 앞서 있다. 일정의 단일 원본 = `docs/16_실행계획.md` §0.
 
 | 릴리스 | 마감 | 마일스톤 |
 |---|---|---|
@@ -30,6 +30,7 @@
 gh auth refresh -s project,read:project
 ```
 - 결정 C(3차 컷) — 폐기. 결정 A로 의미 없어짐.
+- **사용자 작업 D — Apple 로그인 키 (Day 5 실제 로그인 전까지)**: Apple Developer → Certificates, IDs & Profiles → Keys 에서 "Sign in with Apple" 키(.p8) 생성, App ID `kr.mwonmal.app`에 Sign in with Apple 켜기. Team ID·Key ID·.p8 내용은 **커밋하지 말고** `services/api/.env`(무시됨)에 → 키 이름은 `services/api/.env.example`. 없으면 서버는 로그인을 401로 거절한다(ADR-0014).
 
 ## 3. 끝난 것 (다시 안 해도 됨)
 
@@ -76,8 +77,11 @@ claude --resume d706151f-c3f9-42a5-992f-455277dca82f    # 기존 대화 이어�
 
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)
 
-1. ~~Day 1 (#4) 17테이블 마이그레이션 + `/ready` DB ping~~ → PR #92 머지 `ce787a6`. #4 잔여: `/levels`, schemathesis `|| true` 제거, `.env.example`
-2. **Day 2 (10/27 화, server, #6)**: Apple id_token 검증 + JWT RS256 + `POST /auth/oauth/apple` + `GET /users/me`
-3. Day 3 (10/28 수, app, #3): swift-openapi-generator 활성화, 43 op 컴파일
+1. ~~Day 1 (#4) 17테이블 마이그레이션 + `/ready` DB ping~~ → PR #92. #4 잔여: `/levels`, schemathesis `|| true` 제거
+2. ~~Day 2 (#6) Apple 로그인 + JWT RS256 + `/users/me`~~ → PR #94, ADR-0014. 계약과 알려진 차이 3건(ADR-0014 §5)
+3. **Day 3 (app, #3)**: swift-openapi-generator 활성화, 43 op 생성·컴파일, KST DateTranscoder
+4. Day 4 (app, #8): Sign in with Apple(네이티브) + Keychain TokenStore
+
+같이 고친 것: gitleaks가 `contracts/**` 변경 때만 돌던 구멍 → `secrets.yml`(PR #95, lessons 2026-10-25). httpx로 들어온 certifi CRITICAL → 2026.10.23.
 
 금요일마다 15분 회고 → `docs/log/`. 2일 이상 밀리면 ADR-0013 §7 컷 순서 발동.
