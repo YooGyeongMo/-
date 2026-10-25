@@ -73,7 +73,7 @@ claude --resume d706151f-c3f9-42a5-992f-455277dca82f    # 기존 대화 이어�
 
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)
 
-1. **Day 1 (10/26 월, server, #4)**: SQLAlchemy 2 + Alembic, 0001 = v1.0 테이블 7개(dbml v1.0 그대로), `/ready` DB ping. 완료 기준: upgrade↔downgrade 왕복, pytest·ruff·mypy 초록
+1. **Day 1 (10/26 월, server, #4)**: SQLAlchemy 2 + Alembic, 0001 = dbml v1.0 17테이블 그대로(FK 때문에 일부만은 불가), `/ready` DB ping. 완료 기준: upgrade↔downgrade 왕복, pytest·ruff·mypy 초록
 2. Day 2 (10/27 화, server, #6): Apple id_token 검증 + JWT RS256 + `POST /auth/oauth/apple` + `GET /users/me`
 3. Day 3 (10/28 수, app, #3): swift-openapi-generator 활성화, 43 op 컴파일
 
