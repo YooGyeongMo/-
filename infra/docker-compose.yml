@@ -8,12 +8,17 @@ services:
   api_blue:
     build: { context: .., dockerfile: services/api/Dockerfile }
     image: ghcr.io/yoogyeongmo/mwonmal-api:${API_TAG:-local}
-    environment: { MWONMAL_ENV: local }
+    environment:
+      MWONMAL_ENV: local
+      MWONMAL_DATABASE_URL: mysql+aiomysql://root:local@mysql:3306/mwonmal?charset=utf8mb4
+    depends_on: { mysql: { condition: service_healthy } }
     healthcheck: { test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/ready')"], interval: 5s, retries: 10 }
   api_green:
     build: { context: .., dockerfile: services/api/Dockerfile }
     image: ghcr.io/yoogyeongmo/mwonmal-api:${API_TAG:-local}
-    environment: { MWONMAL_ENV: local }
+    environment:
+      MWONMAL_ENV: local
+      MWONMAL_DATABASE_URL: mysql+aiomysql://root:local@mysql:3306/mwonmal?charset=utf8mb4
     profiles: [green]
   mysql:
     image: mysql:8.4

@@ -5,6 +5,8 @@ WORKDIR /srv
 COPY services/api/pyproject.toml services/api/uv.lock* ./
 RUN uv sync --frozen --no-dev --no-install-project || uv sync --no-dev --no-install-project
 COPY services/api/app ./app
+COPY services/api/alembic.ini ./alembic.ini
+COPY services/api/migrations ./migrations
 COPY contracts /contracts
 ENV MWONMAL_CONTRACT_PATH=/contracts/openapi.yml
 RUN useradd -m app && chown -R app /srv
