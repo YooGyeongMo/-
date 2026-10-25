@@ -4,13 +4,13 @@
 > 대화 기록은 길어지면 자동 요약되어 세부가 날아간다. 그래서 중요한 것은 전부 여기와 `docs/` 아래, 그리고 GitHub 이슈에 있다.
 > 세션이 끝날 때마다 이 파일을 갱신한다(`/mw-save`). 새 세션은 `/mw` 로 이 파일부터 읽는다.
 
-**마지막 갱신**: 2026-10-25 · **main**: (이 PR 머지 후 `/mw-save`가 갱신) · **CI**: 3개 워크플로 초록
+**마지막 갱신**: 2026-10-25 · **main**: `ce787a6` · **CI**: server 초록(main, MySQL 8.4 왕복 포함 58 통과)
 
 ---
 
 ## 1. 지금 단계 — 한 문장
 
-**롤링 릴리스 확정(ADR-0013).** v1.0 해석 = **2026-11-20(금)**, 평일 하루 3h × 20일. 다음은 **Day 1(10/26 월) 서버 DB 마이그레이션**이다. 일정의 단일 원본 = `docs/16_실행계획.md` §0.
+**롤링 릴리스 확정(ADR-0013).** v1.0 해석 = **2026-11-20(금)**, 평일 하루 3h × 20일. **Day 1 완료(10/25 당겨서, PR #92)** → 다음은 **Day 2(10/27 화) Apple 로그인 서버(#6)**. 10/26(월)은 하루 앞서 있으니 Day 2를 당기거나 #4 잔여(`/levels`·schemathesis `|| true` 제거·`.env.example`)를 한다. 일정의 단일 원본 = `docs/16_실행계획.md` §0.
 
 | 릴리스 | 마감 | 마일스톤 |
 |---|---|---|
@@ -76,8 +76,8 @@ claude --resume d706151f-c3f9-42a5-992f-455277dca82f    # 기존 대화 이어�
 
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)
 
-1. **Day 1 (10/26 월, server, #4)**: SQLAlchemy 2 + Alembic, 0001 = dbml v1.0 17테이블 그대로(FK 때문에 일부만은 불가), `/ready` DB ping. 완료 기준: upgrade↔downgrade 왕복, pytest·ruff·mypy 초록
-2. Day 2 (10/27 화, server, #6): Apple id_token 검증 + JWT RS256 + `POST /auth/oauth/apple` + `GET /users/me`
+1. ~~Day 1 (#4) 17테이블 마이그레이션 + `/ready` DB ping~~ → PR #92 머지 `ce787a6`. #4 잔여: `/levels`, schemathesis `|| true` 제거, `.env.example`
+2. **Day 2 (10/27 화, server, #6)**: Apple id_token 검증 + JWT RS256 + `POST /auth/oauth/apple` + `GET /users/me`
 3. Day 3 (10/28 수, app, #3): swift-openapi-generator 활성화, 43 op 컴파일
 
 금요일마다 15분 회고 → `docs/log/`. 2일 이상 밀리면 ADR-0013 §7 컷 순서 발동.
