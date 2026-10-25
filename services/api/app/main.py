@@ -7,8 +7,10 @@ import yaml
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from app.core import errors
 from app.core.db import get_engine, ping
 from app.core.settings import settings
+from app.identity.api.routes import router as identity_router
 
 CONTRACT = Path(__file__).resolve().parent.parent / settings.contract_path
 
@@ -20,6 +22,8 @@ def load_contract() -> dict[str, Any]:
 
 
 app = FastAPI(title="뭔말인교? API", openapi_url=None, docs_url=None)
+errors.install(app)
+app.include_router(identity_router)
 
 
 @app.get("/openapi.json", include_in_schema=False)

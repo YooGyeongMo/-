@@ -4,10 +4,16 @@
 `tests/test_schema_matches_dbml.py` 가 dbml 과의 차이를 잡는다.
 """
 
+from collections.abc import AsyncIterator
 from functools import lru_cache
 
 import sqlalchemy as sa
-from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
 from app.core.settings import settings
@@ -43,3 +49,14 @@ async def ping(engine: AsyncEngine) -> bool:
     except Exception:  # noqa: BLE001 - /ready 는 원인과 무관하게 false 만 알면 된다
         return False
     return True
+
+
+@lru_cache(maxsize=1)
+def _sessionmaker() -> async_sessionmaker[AsyncSession]:
+    return async_sessionmaker(get_engine(), expire_on_commit=False)
+
+
+async def session() -> AsyncIterator[AsyncSession]:
+    """FastAPI 의존성. 요청 하나 = 트랜잭션 하나(14번 §6). 예외면 롤백, 아니면 커밋."""
+    async with _sessionmaker()() as s, s.begin():
+        yield s
