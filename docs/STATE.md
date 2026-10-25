@@ -17,7 +17,10 @@
 | v1.0 해석 | 11/20(금) | iPhone, Apple 로그인 → 붙여넣기 → 해석 → 기록 → 설정, OCI + TestFlight 내부 |
 | v1.1 복습 | 12/3(목) | 온보딩·카드·복습·퀴즈·Motion |
 | v1.2 회의 | 12/24(목) | 녹음 → 받아쓰기 → 해석, 알림 |
-| v1.3 iPad·Mac | 2027-01-13(수) | 넓은 레이아웃, macOS, 딥링크 |
+| v1.3 iPad | 2027-01-08(금) | iPad 넓은 레이아웃, 알림·딥링크 |
+| v1.4 macOS | 2027-01-19(화) | macOS TestFlight, Mac 창·메뉴 |
+
+플랫폼 순서: **iPhone → iPad → macOS** (iPad·macOS를 한 릴리스에 묶지 않는다).
 
 ## 2. 🚨 지금 막혀 있는 것
 
@@ -37,7 +40,7 @@ gh auth refresh -s project,read:project
 - **서버 뼈대**: FastAPI `/health` `/ready`, 원본 yml 서빙, pytest·ruff·mypy 통과, Docker Compose(caddy·mysql·redis·minio·prism), 블루그린 스크립트
 - **`eval/`**: `cost_model.py`(표준 라이브러리만, tomllib), `pricing.toml`(전부 unverified), `run.py` 뼈대, 테스트 20개 통과
 - **문서**: REQUIREMENTS 35개 + v1.1 이관 27항목, ADR 0001~0012, 설계문서 12·13·14·15, 실행계획 v2, 협의체 기록(`docs/council/`), 배운 점 2건, BM 전략, archify 그림 3장
-- **GitHub**: 이슈 79건 → 마일스톤 `v1.0 해석`·`v1.1 복습`·`v1.2 회의`·`v1.3 iPad·Mac`·`백로그` (2026-10-25 재배치). `sprint:S*` 라벨은 옛 기록으로 남아 있다
+- **GitHub**: 이슈 79건 → 마일스톤 `v1.0 해석`·`v1.1 복습`·`v1.2 회의`·`v1.3 iPad`·`v1.4 macOS`·`백로그` (2026-10-25 재배치). `sprint:S*` 라벨은 옛 기록으로 남아 있다
 
 ## 4. 절대 어기면 안 되는 것
 
