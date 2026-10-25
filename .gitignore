@@ -81,3 +81,9 @@ infra/**/*.tfstate*
 .terraform/
 # misc
 .DS_Store
+
+# 시크릿 파일 (어느 폴더든). 키 이름 견본만 커밋한다.
+.env
+.env.*
+!.env.example
+.schemathesis/
