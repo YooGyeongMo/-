@@ -16,12 +16,23 @@ jobs:
     defaults:
       run:
         working-directory: services/api
+    # 마이그레이션 왕복·alembic check 를 실제 MySQL 8.4 에서도 돌린다 (tests/test_migrations.py).
+    services:
+      mysql:
+        image: mysql:8.4
+        env: { MYSQL_ROOT_PASSWORD: ci, MYSQL_DATABASE: mwonmal }
+        ports: ["3306:3306"]
+        options: >-
+          --health-cmd "mysqladmin ping -pci" --health-interval 5s --health-retries 20
+    env:
+      MWONMAL_TEST_MYSQL_URL: mysql+aiomysql://root:ci@127.0.0.1:3306/mwonmal?charset=utf8mb4
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v3
       - run: uv sync
       - run: uv run ruff check . && uv run ruff format --check .
       - run: uv run mypy .
+      - run: uv run lint-imports
       - run: uv run pytest -q
   contract:
     runs-on: ubuntu-latest

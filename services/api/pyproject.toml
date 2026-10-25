@@ -7,6 +7,10 @@ dependencies = [
   "uvicorn[standard]>=0.30",
   "pydantic-settings>=2.5",
   "pyyaml>=6",
+  "sqlalchemy[asyncio]>=2.0.36",
+  "alembic>=1.14",
+  "aiomysql>=0.2",
+  "cryptography>=43",
 ]
 
 [dependency-groups]
@@ -19,6 +23,8 @@ dev = [
   "types-PyYAML",
   "jsonschema>=4.23",
   "types-jsonschema",
+  "aiosqlite>=0.20",
+  "import-linter>=2.1",
 ]
 
 [tool.ruff]
@@ -32,3 +38,18 @@ select = ["E", "F", "I", "B", "UP", "S"]
 strict = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# 컨텍스트끼리 직접 import 금지 (14번 §3, §17). 공용은 app.core 만.
+[tool.importlinter]
+root_package = "app"
+
+[[tool.importlinter.contracts]]
+name = "컨텍스트 독립"
+type = "independence"
+modules = ["app.identity", "app.workspace", "app.decode", "app.learning", "app.notify"]
+
+[[tool.importlinter.contracts]]
+name = "core 는 컨텍스트를 모른다"
+type = "forbidden"
+source_modules = ["app.core"]
+forbidden_modules = ["app.identity", "app.workspace", "app.decode", "app.learning", "app.notify"]

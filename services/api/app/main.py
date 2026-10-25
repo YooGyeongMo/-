@@ -7,6 +7,7 @@ import yaml
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from app.core.db import get_engine, ping
 from app.core.settings import settings
 
 CONTRACT = Path(__file__).resolve().parent.parent / settings.contract_path
@@ -32,6 +33,8 @@ def health() -> dict[str, str]:
 
 
 @app.get("/ready", include_in_schema=False)
-def ready() -> dict[str, str]:
-    # S0 Day 4: DB·Redis·S3 ping 추가
-    return {"status": "ready"}
+async def ready() -> JSONResponse:
+    # 블루그린 전환은 이 응답으로 판단한다(ADR-0003). Redis·S3 ping 은 쓰는 기능이 생길 때 추가.
+    if await ping(get_engine()):
+        return JSONResponse({"status": "ready", "db": "up"})
+    return JSONResponse({"status": "not_ready", "db": "down"}, status_code=503)
