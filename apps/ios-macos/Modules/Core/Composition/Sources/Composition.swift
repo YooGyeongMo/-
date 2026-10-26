@@ -85,8 +85,12 @@ public struct SessionRootView: View {
             case .none:
                 ProgressView()
             case .signedOut:
-                AuthRootView(isSigningIn: session.isSigningIn, errorMessage: session.lastError?.userMessage) {
-                    session.signIn()
+                AuthRootView(isSigningIn: session.isSigningIn, errorMessage: session.lastError?.userMessage) { outcome in
+                    switch outcome {
+                    case let .code(code): session.signIn(withAppleCode: code)
+                    case .cancelled: break
+                    case .failed: session.appleSignInFailed()
+                    }
                 }
             case .signedIn, .unverified:
                 AppRootView()
