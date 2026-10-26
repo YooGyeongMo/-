@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 채택 (2026-09-21) — Foundation Models 포함 여부는 S2 실측 후 이 문서 §8 점수표로 확정 |
+| 상태 | 채택 (2026-09-21) — Foundation Models 포함 여부는 S2 실측 후 이 문서 §8 점수표로 확정 · **개정 2026-10-26 → ADR-0015**: v1.0 FM 제외(앱 코드 0), §4-3 진입 조건은 "Mac 26 + iPhone 26"이 아니라 **모델 태그별**(`fm/apple-26.4`, `fm/apple-27-core`, `fm/apple-27-adv`), iOS 27·AFM 3 출시 반영 |
 | 관련 REQ | REQ-10(전부 비교), REQ-11(무료 티어), REQ-12(품질·지연·BM 라우팅), REQ-13(비용 모델), REQ-14(사전 우선·인덱스 재계산), REQ-23 |
 | 관련 결정 | 14번 §15 **재작성**, 15번 §H 유지(80% 게이트), FD-5, FD-7(라우터), AI-1·2·3·5·6·7, Backend B-0·B-1, PM-3, RT-A-02·04·05·06·12·15, RT-B-02·03·13·17, 사용자 결정 (1) |
 | 출처 | `council/S0/AI.md` §1~§5·§7, `council/S0/Backend.md` B-0·B-1·B-4, `council/S0/REDTEAM_A.md`, `council/S0/REDTEAM_B.md` |
