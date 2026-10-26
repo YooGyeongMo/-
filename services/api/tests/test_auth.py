@@ -315,3 +315,13 @@ def test_token_with_future_iat_or_without_exp_rejected(
     for tok in (future, no_exp):
         r = client.get("/api/users/me", headers={"Authorization": f"Bearer {tok}"})
         assert r.status_code == 401
+
+
+@pytest.mark.parametrize("code", ["", "   "])
+def test_empty_code_is_401_without_calling_apple(
+    client: TestClient, fake_apple: FakeApple, code: str
+) -> None:
+    # 계약 v1.0 OAuthLoginRequest.code 엔 minLength 가 없다 → 400 이 아니라 OAUTH_CODE_INVALID.
+    r = client.post(LOGIN, json={**BODY, "code": code})
+    assert r.status_code == 401 and r.json()["code"] == "OAUTH_CODE_INVALID"
+    assert fake_apple.token_requests == []

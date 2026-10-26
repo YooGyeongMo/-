@@ -5,7 +5,7 @@ from typing import Annotated, Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.core.auth import CurrentPrincipal
 from app.core.db import DbSession
@@ -44,8 +44,9 @@ def oauth_provider(
 
 
 class OAuthLoginRequest(BaseModel):
-    code: str = Field(min_length=1)
-    redirectUri: str = Field(min_length=1)  # noqa: N815 - 계약 필드 이름 그대로
+    # 계약 v1.0 은 minLength 가 없다 → 빈 code 는 400 이 아니라 "틀린 code"(401, Apple 호출 없음).
+    code: str
+    redirectUri: str  # noqa: N815 - 계약 필드 이름 그대로
 
 
 def user_response(a: Account) -> dict[str, Any]:

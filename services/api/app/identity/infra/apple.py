@@ -97,6 +97,8 @@ class AppleOAuth:
         if not self.configured:
             log.error("apple_oauth_not_configured")
             raise _fail()
+        if not code.strip():
+            raise _fail()  # 빈 code 는 Apple 에 보낼 필요도 없다
         try:
             r = await self._http.post(
                 TOKEN_URL,
