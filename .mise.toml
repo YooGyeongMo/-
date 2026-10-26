@@ -1,5 +1,7 @@
 [tools]
 tuist = "4.208.0"
 swiftformat = "0.63.0"
+# 로컬·CI 같은 버전(2026-10-26: 로컬 brew 0.59.1 vs CI brew 최신 0.65.1이라 새 규칙이 CI에서만 걸렸다)
+swiftlint = "0.65.1"
 python = "3.12"
 uv = "latest"

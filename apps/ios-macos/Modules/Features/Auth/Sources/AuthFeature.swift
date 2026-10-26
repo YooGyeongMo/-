@@ -38,7 +38,7 @@ public struct AuthRootView: View {
             // Figma 비율(393×470) 그대로 화면 너비에 맞춘다 → 어떤 기기에서도 해·언덕·인물이 잘리지 않는다.
             // 아주 큰 글자에서 공간이 모자라면 일러스트가 먼저 줄어든다(패널 글자가 우선).
             MwIllustration.loginHero
-                .aspectRatio(contentMode: .fit)
+                .scaledToFit()
                 .frame(maxWidth: .infinity)
                 .ignoresSafeArea(edges: .top)
             panel
