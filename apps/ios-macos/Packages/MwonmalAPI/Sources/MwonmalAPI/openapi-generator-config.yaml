@@ -1,0 +1,7 @@
+# swift-openapi-generator 설정. 입력은 contracts/openapi.yml(계약 v1.0)의 심볼릭 링크다.
+# 생성물은 커밋하지 않는다(빌드 플러그인, 15번 T-C9).
+generate:
+  - types
+  - client
+accessModifier: public
+namingStrategy: idiomatic

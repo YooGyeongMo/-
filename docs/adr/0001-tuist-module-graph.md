@@ -2,6 +2,7 @@
 
 - 상태: 채택 (2026-09-19)
 - 관련: 설계 12번 §0·§1-3, 15번 T-C4, 이슈 #2
+- 2026-10-26 개정(#3): MwonmalAPI는 Tuist 타깃이 아니라 **로컬 Swift 패키지**(`apps/ios-macos/Packages/MwonmalAPI`)로 둔다. swift-openapi-generator가 빌드 플러그인인데, Tuist가 `openapi.yaml`·설정 yaml을 타깃 파일에서 빼서 플러그인이 입력을 못 찾았다(`sources` 글롭·`buildableFolders` 둘 다 실패). 로컬 패키지는 Xcode 기본 SPM 통합으로 들어가 플러그인이 정상 동작한다(Tuist 문서: 플러그인은 이 방식만 지원). 테스트는 `swift test --package-path`로 CI에서 따로 돈다. 정정: "의존 그래프 위반은 생성 실패"는 순환만 해당, 레이어 방향은 Tuist가 막지 않는다.
 - 2026-09-21 개정: Domain은 watchOS 10.0 데스티네이션 포함(ADR-0010) — `Domain`·`DomainTests`만 `.appleWatch` 추가, 의존성 0 확인 후. 다른 모듈은 그대로.
 
 ## 맥락

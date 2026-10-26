@@ -1,8 +1,8 @@
 import ProjectDescription
 
-/// 모듈 그래프 (설계 12번 §0). 의존 방향 위반은 생성 단계에서 실패한다.
+/// 모듈 그래프 (설계 12번 §0). Tuist는 순환 의존만 막고 레이어 방향은 막지 않는다(2026-10-26 확인) → 방향 검사는 별도 스크립트로(ADR-0016 예정).
 /// Composition → Navigation → Presentation → Domain
-/// Presentation → MwonmalUI ; Data → Domain, MwonmalAPI, Platform ; Platform → Domain
+/// Presentation → MwonmalUI ; Data → Domain, MwonmalAPI(로컬 패키지), Platform ; Platform → Domain
 /// REQ-02 / FD-1 / ADR-0005: 최소 iOS 17.0 · macOS 14.0. 18·26 전용 API 게이트는 Platform · MwonmalUI/Compat · Composition/AppContainer 세 곳만.
 let minimumOS: DeploymentTargets = .multiplatform(iOS: "17.0", macOS: "14.0")
 /// FD-10 / ADR-0001 개정: Domain(의존성 0)만 watchOS 10.0 데스티네이션을 추가한다. v2 워치 앱이 DeepLink·StreakStatus를 공유하기 위함.
@@ -11,7 +11,6 @@ let domainOS: DeploymentTargets = .multiplatform(iOS: "17.0", macOS: "14.0", wat
 let unitTests: [TestableTarget] = [
     "DomainTests",
     "MwonmalUITests",
-    "MwonmalAPITests",
     "PlatformTests",
     "DataTests",
     "PresentationTests",
@@ -23,6 +22,11 @@ let project = Project(
     name: "Mwonmal",
     organizationName: "Mwonmal",
     options: .options(defaultKnownRegions: ["ko"], developmentRegion: "ko"),
+    // MwonmalAPI는 OpenAPI 생성기(빌드 플러그인)를 쓰므로 로컬 Swift 패키지로 두고 Xcode 기본 SPM 통합으로 넣는다.
+    // Tuist 문서: 빌드 플러그인은 이 방식만 지원한다. 단위 테스트는 `swift test --package-path Packages/MwonmalAPI`.
+    packages: [
+        .local(path: "Packages/MwonmalAPI"),
+    ],
     settings: .settings(base: ["SWIFT_VERSION": "6.0", "SWIFT_STRICT_CONCURRENCY": "complete"]),
     targets: [
         .target(
@@ -64,25 +68,6 @@ let project = Project(
             dependencies: [.target(name: "MwonmalUI")]
         ),
         .target(
-            name: "MwonmalAPI",
-            destinations: [.iPhone, .iPad, .mac],
-            product: .staticFramework,
-            bundleId: "kr.mwonmal.mwonmalapi",
-            deploymentTargets: minimumOS,
-            sources: ["Modules/MwonmalAPI/Sources/**"],
-            resources: nil,
-            dependencies: []
-        ),
-        .target(
-            name: "MwonmalAPITests",
-            destinations: [.iPhone, .iPad, .mac],
-            product: .unitTests,
-            bundleId: "kr.mwonmal.mwonmalapi.tests",
-            deploymentTargets: minimumOS,
-            sources: ["Modules/MwonmalAPI/Tests/**"],
-            dependencies: [.target(name: "MwonmalAPI")]
-        ),
-        .target(
             name: "Platform",
             destinations: [.iPhone, .iPad, .mac],
             product: .staticFramework,
@@ -109,7 +94,7 @@ let project = Project(
             deploymentTargets: minimumOS,
             sources: ["Modules/Data/Sources/**"],
             resources: nil,
-            dependencies: [.target(name: "Domain"), .target(name: "MwonmalAPI"), .target(name: "Platform")]
+            dependencies: [.target(name: "Domain"), .package(product: "MwonmalAPI", type: .runtime), .target(name: "Platform")]
         ),
         .target(
             name: "DataTests",

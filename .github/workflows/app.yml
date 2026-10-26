@@ -52,7 +52,9 @@ jobs:
           path: |
             apps/ios-macos/.tuist-cache
             apps/ios-macos/Tuist/.build
-          key: tuist-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'contracts/openapi.yml') }}
+          key: tuist-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'apps/ios-macos/.package.resolved', 'apps/ios-macos/Packages/MwonmalAPI/Package.resolved', 'contracts/openapi.yml') }}
+      # MwonmalAPI(생성 클라이언트 + 미들웨어)는 로컬 패키지라 Xcode 스킴 테스트에 들어가지 않는다. 따로 돌린다.
+      - run: swift test --package-path apps/ios-macos/Packages/MwonmalAPI
       - run: cd apps/ios-macos && tuist install && tuist generate --no-open
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation build
       - run: cd apps/ios-macos && xcodebuild -workspace Mwonmal.xcworkspace -scheme MwonmalMac -destination 'platform=macOS' -skipPackagePluginValidation test
