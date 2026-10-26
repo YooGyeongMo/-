@@ -60,7 +60,7 @@ R2 자기 수정 공격에서 나온 것: JWKS 재요청 간격 제한이 **실�
 
 - **Docker Desktop이 레드팀 중간에 응답 불능이 됐다.** 그래서 다음은 로컬에서 못 했다. 이 브랜치 PR의 CI(server.yml: MySQL 서비스·이미지 빌드·Trivy)가 첫 실측이다.
   - H4 잠금 읽기의 **실제 MySQL 경합 테스트**(`tests/test_account_repository.py::test_real_race_on_mysql`): 코드와 테스트는 작성했지만 MySQL에서 돌려 보지 못했다. 수정 전 코드로 이 테스트가 실패하는 것도 MySQL에서 확인하지 못했다.
-  - Docker 이미지 빌드(uv 0.12.13 고정, root 소유 /srv에서 비root 실행, HEALTHCHECK), Trivy 스캔
+  - Docker 이미지 빌드(uv는 빌드 단계만 — 0.12.13이 Trivy CRITICAL(GHSA-hq85-5cpj-mr62)이라 0.13.5 + 2단계 빌드로 실행 이미지에서 제거, root 소유 /srv에서 비root 실행, HEALTHCHECK), Trivy 스캔
   - 수정된 Caddyfile·blue-green.sh를 실제 Caddy로 실행(H3 공격 자체는 수정 전 설정으로 Docker에서 재현했다. 수정 후 동작은 Caddy 소스 기준 추론과 리뷰어 확인뿐)
   - gitleaks 로컬 스캔(CI secrets job에 맡김. 테스트 키는 전부 실행 중에 만든다)
 - 수정 전 MySQL 마이그레이션 왕복(up/down)과 기존 MySQL 테스트는 R1 초반에 통과를 확인했다(81 passed, skip 0).

@@ -1,15 +1,22 @@
-FROM python:3.12-slim AS base
-# 2026-10-26 레드팀: 이미지 기본 env = prod (fail-closed). 설정을 빠뜨리면 JWT 임시 키로 조용히 뜨지
-# 않고 기동이 실패한다. 로컬 Compose 는 MWONMAL_ENV=local 을 명시한다.
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
-    MWONMAL_ENV=prod WEB_CONCURRENCY=2 \
-    UV_NO_CACHE=1 UV_COMPILE_BYTECODE=0
-# uv 버전 고정(빌드 재현성·공급망). 올릴 땐 이 줄만 바꾼다.
-RUN pip install --no-cache-dir "uv==0.12.13"
+# 2단계 빌드: uv는 빌드 단계에서만 쓰고 실행 이미지에는 넣지 않는다.
+# (2026-10-26 Trivy: uv 0.12.13 번들 CA 저장소 GHSA-hq85-5cpj-mr62 CRITICAL → 실행에 필요 없는 도구는 이미지에서 뺀다)
+FROM python:3.12-slim AS build
+ENV UV_NO_CACHE=1 UV_COMPILE_BYTECODE=0 UV_PROJECT_ENVIRONMENT=/srv/.venv
+# uv 버전 고정(빌드 재현성·공급망). 올릴 땐 이 줄만 바꾼다. 0.13.4+ 에서 위 권고 수정.
+RUN pip install --no-cache-dir "uv==0.13.5"
 WORKDIR /srv
 COPY services/api/pyproject.toml services/api/uv.lock ./
 # 잠금 파일 그대로만 설치한다. 실패하면 빌드 실패(예전엔 `|| uv sync` 로 잠금을 무시하고 새로 풀었다).
 RUN uv sync --frozen --no-dev --no-install-project
+
+FROM python:3.12-slim AS base
+# 2026-10-26 레드팀: 이미지 기본 env = prod (fail-closed). 설정을 빠뜨리면 JWT 임시 키로 조용히 뜨지
+# 않고 기동이 실패한다. 로컬 Compose 는 MWONMAL_ENV=local 을 명시한다.
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 \
+    MWONMAL_ENV=prod WEB_CONCURRENCY=2
+WORKDIR /srv
+# 같은 베이스 이미지라 venv 안의 python 링크(/usr/local/bin/python3)가 그대로 맞는다.
+COPY --from=build /srv/.venv /srv/.venv
 COPY services/api/app ./app
 COPY services/api/alembic.ini ./alembic.ini
 COPY services/api/migrations ./migrations
