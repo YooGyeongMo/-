@@ -1,5 +1,5 @@
 included: [apps/ios-macos]
-excluded: [apps/ios-macos/Derived, apps/ios-macos/**/Generated]
+excluded: [apps/ios-macos/Derived, apps/ios-macos/**/Generated, apps/ios-macos/Packages/*/.build, apps/ios-macos/Tuist/.build]
 disabled_rules: [trailing_comma, todo]
 opt_in_rules: [empty_count, explicit_init, first_where, sorted_imports, unowned_variable_capture]
 line_length: { warning: 140, error: 180 }
