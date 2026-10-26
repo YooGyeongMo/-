@@ -79,7 +79,10 @@ def test_contract_job_is_not_masked() -> None:
 
 
 def test_runtime_stage_has_no_uv() -> None:
-    """실행 이미지에는 설치 도구(uv)를 넣지 않는다 — 2026-10-26 Trivy CRITICAL(GHSA-hq85-5cpj-mr62)."""
+    """실행 이미지에는 설치 도구(uv)를 넣지 않는다.
+
+    2026-10-26 Trivy CRITICAL(GHSA-hq85-5cpj-mr62).
+    """
     stages = re.split(r"(?m)^FROM ", DOCKERFILE)
     assert len(stages) >= 3, "빌드 단계와 실행 단계가 나뉘어야 한다"
     runtime = stages[-1]
