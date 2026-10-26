@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "ko",
+  "strings": {
+    "home.root.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "홈"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Home"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

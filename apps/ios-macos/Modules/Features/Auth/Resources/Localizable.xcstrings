@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "ko",
+  "strings": {
+    "auth.root.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign in"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
