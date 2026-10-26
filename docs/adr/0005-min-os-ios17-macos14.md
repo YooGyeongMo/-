@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 채택 (2026-09-21) · **개정 2026-10-26 → ADR-0015**: FM 게이트 세 겹 → 다섯 겹(토큰 예산·모델 태그 플래그 추가), `IndexedEntity`(18)·`SnippetIntent`(26)·`IntentValueQuery`(26) 게이트 행 추가 |
+| 상태 | 채택 (2026-09-21) · **개정 2026-10-26 → ADR-0015**: FM 게이트 세 겹 → 다섯 겹(토큰 예산·모델 태그 플래그 추가), `IndexedEntity`(18)·`SnippetIntent`(26)·`IntentValueQuery`(26) 게이트 행 추가 · **개정 2026-10-26 → ADR-0017**: "v1.0에 글래스 없음"은 커스텀 표면에만 해당(Xcode 26 SDK 빌드면 시스템 바·시트·컨트롤은 자동 글래스). 커스텀 글래스는 `MwonmalUI/Compat` 두 모디파이어만 |
 | 관련 REQ | REQ-02(최소 OS), REQ-01·03(화면), REQ-10(온디바이스 AI 트랙) |
 | 관련 결정 | 15번 T-C2 **폐기**(26 only → 17+), 12번 D-3 유지, D-7·T-D3(미리보기 v1.1), FD-1, iOS-A1·A-2·A-4, MI-5, RT-A-08·09, RT-B-02·06 |
 | 출처 | `council/S0/iOS.md` §A, `council/S0/macOS_iPad.md` §0·MI-5, `council/S0/REDTEAM_A.md` §B(Apple 문서 검증 표), `council/S0/PM.md` PM-2 |
