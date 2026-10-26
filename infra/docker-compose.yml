@@ -4,6 +4,8 @@ services:
     image: caddy:2
     ports: ["8080:80"]
     volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "caddy_data:/data"]
+    # 블루그린 활성 색(deploy/blue-green.sh 가 씀, git 무시). 없으면 Caddyfile 기본값 blue.
+    env_file: [{ path: .upstream, required: false }]
     depends_on: [api_blue]
   api_blue:
     build: { context: .., dockerfile: services/api/Dockerfile }
@@ -11,6 +13,8 @@ services:
     environment:
       MWONMAL_ENV: local
       MWONMAL_DATABASE_URL: mysql+aiomysql://root:local@mysql:3306/mwonmal?charset=utf8mb4
+      # local 은 JWT 임시 키라 워커마다 키가 다르다 → 워커 1개(아니면 토큰이 절반 확률로 401).
+      WEB_CONCURRENCY: "1"
     depends_on: { mysql: { condition: service_healthy } }
     healthcheck: { test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/ready')"], interval: 5s, retries: 10 }
   api_green:
@@ -19,6 +23,7 @@ services:
     environment:
       MWONMAL_ENV: local
       MWONMAL_DATABASE_URL: mysql+aiomysql://root:local@mysql:3306/mwonmal?charset=utf8mb4
+      WEB_CONCURRENCY: "1"
     profiles: [green]
   mysql:
     image: mysql:8.4
@@ -32,7 +37,8 @@ services:
     image: minio/minio
     command: server /data --console-address ":9001"
     environment: { MINIO_ROOT_USER: local, MINIO_ROOT_PASSWORD: localpass }
-    ports: ["9000:9000", "9001:9001"]
+    # 로컬 고정 자격증명이라 LAN 에 열지 않는다.
+    ports: ["127.0.0.1:9000:9000", "127.0.0.1:9001:9001"]
     volumes: ["minio_data:/data"]
   prism:
     image: stoplight/prism:5

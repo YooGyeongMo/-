@@ -87,3 +87,6 @@ infra/**/*.tfstate*
 .env.*
 !.env.example
 .schemathesis/
+
+# infra: 블루그린 활성 색 상태 (deploy/blue-green.sh)
+infra/.upstream
