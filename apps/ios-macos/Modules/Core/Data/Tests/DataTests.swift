@@ -2,7 +2,7 @@
 import Testing
 
 struct DataModuleTests {
-    @Test func moduleName() {
+    @Test("모듈 이름") func moduleName() {
         #expect(DataModule.name == "Data")
     }
 

@@ -174,3 +174,24 @@ struct ClientFactoryTests {
         #expect(MwonmalAPIModule.name == "MwonmalAPI")
     }
 }
+
+struct APIErrorCauseTests {
+    @Test("ClientError를 벗겨 URLError를 돌려준다") func unwrapsURLError() async {
+        struct Failing: ClientTransport {
+            func send(_: HTTPRequest, body _: HTTPBody?, baseURL _: URL, operationID _: String) async throws -> (HTTPResponse, HTTPBody?) {
+                throw URLError(.notConnectedToInternet)
+            }
+        }
+        let client = Client(
+            serverURL: URL(fileURLWithPath: "/"),
+            configuration: .init(dateTranscoder: KSTDateTranscoder()),
+            transport: Failing()
+        )
+        do {
+            _ = try await client.getMe()
+            Issue.record("에러가 나야 한다")
+        } catch {
+            #expect((APIErrorCause.root(of: error) as? URLError)?.code == .notConnectedToInternet)
+        }
+    }
+}
