@@ -55,6 +55,8 @@ jobs:
           key: tuist-${{ runner.os }}-${{ env.XCODE_VERSION }}-${{ hashFiles('apps/ios-macos/Tuist/Package.resolved', 'apps/ios-macos/.package.resolved', 'apps/ios-macos/Packages/MwonmalAPI/Package.resolved', 'contracts/openapi.yml') }}
       # MwonmalAPI(생성 클라이언트 + 미들웨어)는 로컬 패키지라 Xcode 스킴 테스트에 들어가지 않는다. 따로 돌린다.
       - run: swift test --package-path apps/ios-macos/Packages/MwonmalAPI
+      # ADR-0019: 온디바이스 지능 패키지(v1.0 앱에는 링크 안 함). FM 실호출 1건은 러너에 Apple Intelligence가 없어 이유를 찍고 건너뛴다.
+      - run: swift test --package-path apps/ios-macos/Packages/MwonmalIntelligence
       - run: cd apps/ios-macos && tuist install && tuist generate --no-open
       # ADR-0016: Tuist는 순환만 막는다. 레이어 방향은 그래프를 내보내 읽을 수 있는 메시지로 검사한다.
       - run: python3 -I scripts/check-module-deps.py --self-test

@@ -1,0 +1,18 @@
+{
+  "version": "seed-v0-synthetic",
+  "note": "합성 시드. 정본 사전은 서버(REQ-14). 공개 저장소에 실사용자 문장 0.",
+  "terms": [
+    {"term": "얼라인", "variants": ["얼라인먼트"]},
+    {"term": "싱크", "variants": ["씽크"]},
+    {"term": "킥오프"},
+    {"term": "R&R"},
+    {"term": "ASAP", "variants": ["아삽"]},
+    {"term": "컨펌"},
+    {"term": "팔로업", "variants": ["팔로우업"]},
+    {"term": "디벨롭"},
+    {"term": "레트로"},
+    {"term": "1on1", "variants": ["원온원"]},
+    {"term": "MECE"},
+    {"term": "리소스"}
+  ]
+}
