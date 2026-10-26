@@ -68,6 +68,74 @@
           }
         }
       }
+    },
+    "auth.signIn.kakao": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "카카오로 계속하기"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue with Kakao"
+          }
+        }
+      }
+    },
+    "auth.signIn.google": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google로 계속하기"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Continue with Google"
+          }
+        }
+      }
+    },
+    "auth.signIn.kakao.comingSoon": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "카카오 로그인은 다음 업데이트에서 열려요. 지금은 Apple로 시작해 주세요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Kakao sign-in is coming in the next update. Please continue with Apple for now."
+          }
+        }
+      }
+    },
+    "auth.signIn.google.comingSoon": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google 로그인은 다음 업데이트에서 열려요. 지금은 Apple로 시작해 주세요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Google sign-in is coming in the next update. Please continue with Apple for now."
+          }
+        }
+      }
     }
   },
   "version": "1.0"
