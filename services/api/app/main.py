@@ -2,6 +2,7 @@
 
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -18,7 +19,9 @@ from app.identity.api.routes import router as identity_router
 CONTRACT = Path(__file__).resolve().parent.parent / settings.contract_path
 
 
+@lru_cache(maxsize=1)
 def load_contract() -> dict[str, Any]:
+    # 98KB YAML 파싱은 요청당 ~70ms CPU. 인증 없는 공개 경로라 매번 파싱하면 CPU DoS(레드팀 R2).
     with CONTRACT.open(encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f)
     return data

@@ -42,7 +42,8 @@ def test_local_api_runs_single_worker() -> None:
     # local 은 JWT 임시 키가 워커마다 달라 워커가 2개면 토큰이 무작위로 401.
     for name in ("api_blue", "api_green"):
         env = COMPOSE["services"][name]["environment"]
-        assert env["MWONMAL_ENV"] == "local" and env["WEB_CONCURRENCY"] == "1"
+        assert env["MWONMAL_ENV"] == "${MWONMAL_ENV:-local}"
+        assert env["WEB_CONCURRENCY"] == "${WEB_CONCURRENCY:-1}"
 
 
 def test_dockerfile_is_fail_closed_and_locked() -> None:
@@ -53,6 +54,7 @@ def test_dockerfile_is_fail_closed_and_locked() -> None:
     assert "chown" not in code  # 코드는 root 소유, 앱 사용자는 실행만
     assert "USER app" in code
     assert "--workers" not in code  # WEB_CONCURRENCY 로만
+    assert '"--http", "h11"' in code  # 헤더 크기 한도
 
 
 def test_workflows_least_privilege_and_pinned() -> None:

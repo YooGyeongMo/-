@@ -5,7 +5,8 @@
 #  - Caddy 관리 API 는 컨테이너 루프백에만 열린다(Caddyfile). 호스트 curl localhost:2019 는 원래도
 #    포트가 publish 되지 않아 닿지 않았고, JSON 경로(handle/0)도 headers 핸들러를 가리켜 틀렸다.
 #  - 전환 = MW_UPSTREAM 환경변수로 Caddyfile 을 다시 적용(`caddy reload`, 컨테이너 안에서 실행).
-#    활성 색은 infra/.upstream 에 남겨 Caddy 컨테이너가 재시작돼도 유지된다.
+#    활성 색은 infra/.upstream 에 남긴다. Caddy 를 다시 띄울 땐 `docker compose up -d caddy`
+#    (env_file 재적용). `docker compose restart caddy` 는 생성 시점 env(=예전 색)로 돌아간다.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 STATE=.upstream

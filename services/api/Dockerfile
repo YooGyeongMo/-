@@ -22,4 +22,6 @@ USER app
 EXPOSE 8080
 HEALTHCHECK CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/ready')" || exit 1
 # 워커 수는 WEB_CONCURRENCY(uvicorn 기본 지원). local 은 1(임시 JWT 키가 워커마다 다르다).
-CMD ["/srv/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-server-header"]
+# --http h11: httptools 는 요청 헤더 크기 한도가 없어 100MB 헤더 하나로 워커 RSS 가 GB 단위로
+# 늘었다(레드팀 R2). h11 은 헤더를 16KB 로 자른다. Caddy 를 거치지 않는 경로에서도 막힌다.
+CMD ["/srv/.venv/bin/uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080", "--no-server-header", "--http", "h11"]

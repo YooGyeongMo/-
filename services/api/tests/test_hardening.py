@@ -204,3 +204,24 @@ def test_engine_hides_bound_parameters() -> None:
         assert get_engine().sync_engine.hide_parameters is True
     finally:
         get_engine.cache_clear()
+
+
+def test_contract_is_parsed_once() -> None:
+    from app.main import load_contract
+
+    assert load_contract() is load_contract()  # 공개 경로 CPU DoS 방지(캐시)
+
+
+def test_whitespace_kid_refused(monkeypatch: pytest.MonkeyPatch, fresh_keys: None) -> None:
+    monkeypatch.setattr(settings, "jwt_kid", "  ")
+    with pytest.raises(RuntimeError):
+        security.check_keys()
+
+
+def test_streamed_413_closes_connection(client: TestClient) -> None:
+    def chunks() -> Iterator[bytes]:
+        for _ in range(40):
+            yield b"a" * 65536
+
+    r = client.post(LOGIN, content=chunks(), headers={"content-type": "application/json"})
+    assert r.status_code == 413 and r.headers["connection"] == "close"

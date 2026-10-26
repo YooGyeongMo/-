@@ -54,7 +54,7 @@ def _keys() -> _Keys:
         raise RuntimeError("JWT 키는 RSA 여야 한다 (RS256)")
     if private.key_size < MIN_RSA_BITS:
         raise RuntimeError(f"JWT RSA 키는 {MIN_RSA_BITS}비트 이상이어야 한다")
-    if not settings.jwt_kid:
+    if not settings.jwt_kid.strip():
         raise RuntimeError("MWONMAL_JWT_KID 가 비었다")
     return _Keys(
         kid=settings.jwt_kid,

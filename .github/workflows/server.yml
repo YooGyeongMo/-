@@ -52,7 +52,8 @@ jobs:
       # 2026-10-26 이전엔 `|| true` + schemathesis 4 에 없는 옵션(--hypothesis-max-examples)이라
       # 명령이 매번 옵션 오류로 끝나고도 초록이었다(검사 0건).
       - run: |
-          (uv run uvicorn app.main:app --port 8080 &) && sleep 3
+          (uv run uvicorn app.main:app --port 8080 &)
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
           uv run schemathesis run http://127.0.0.1:8080/openapi.json \
             --url http://127.0.0.1:8080/api \
             --checks all --exclude-checks allow_header_conformance \

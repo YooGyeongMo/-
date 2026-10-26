@@ -68,7 +68,8 @@ class BodyLimitMiddleware:
                 received += len(message.get("body", b""))
                 if received > limit:
                     # FastAPI 가 본문 파싱 오류를 400 으로 바꾸지 않도록 HTTPException 으로 올린다.
-                    raise HTTPException(status_code=413)
+                    # connection: close — 남은 본문을 서버가 끝까지 읽어 버리지 않게.
+                    raise HTTPException(status_code=413, headers={"connection": "close"})
             return message
 
         await self.app(scope, limited_receive, send)

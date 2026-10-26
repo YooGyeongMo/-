@@ -11,19 +11,21 @@ services:
     build: { context: .., dockerfile: services/api/Dockerfile }
     image: ghcr.io/yoogyeongmo/mwonmal-api:${API_TAG:-local}
     environment:
-      MWONMAL_ENV: local
+      MWONMAL_ENV: ${MWONMAL_ENV:-local}
       MWONMAL_DATABASE_URL: mysql+aiomysql://root:local@mysql:3306/mwonmal?charset=utf8mb4
-      # local 은 JWT 임시 키라 워커마다 키가 다르다 → 워커 1개(아니면 토큰이 절반 확률로 401).
-      WEB_CONCURRENCY: "1"
+      # 기본은 로컬 개발. 서버(블루그린)에선 infra/.env 로 MWONMAL_ENV=prod 등을 준다 — 그러면
+      # 이미지의 fail-closed 검사(JWT 키 필수)가 그대로 동작한다. local 은 JWT 임시 키라 워커마다
+      # 키가 다르다 → 워커 1개(아니면 토큰이 절반 확률로 401).
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
     depends_on: { mysql: { condition: service_healthy } }
     healthcheck: { test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/ready')"], interval: 5s, retries: 10 }
   api_green:
     build: { context: .., dockerfile: services/api/Dockerfile }
     image: ghcr.io/yoogyeongmo/mwonmal-api:${API_TAG:-local}
     environment:
-      MWONMAL_ENV: local
+      MWONMAL_ENV: ${MWONMAL_ENV:-local}
       MWONMAL_DATABASE_URL: mysql+aiomysql://root:local@mysql:3306/mwonmal?charset=utf8mb4
-      WEB_CONCURRENCY: "1"
+      WEB_CONCURRENCY: ${WEB_CONCURRENCY:-1}
     profiles: [green]
   mysql:
     image: mysql:8.4
