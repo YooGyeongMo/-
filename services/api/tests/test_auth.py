@@ -1,6 +1,8 @@
 """POST /api/auth/oauth/{provider}, GET /api/users/me (계약 v1.0 oauthLogin·getMe, Day 2 #6)."""
 
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import jwt
 import pytest
@@ -166,3 +168,182 @@ def test_token_for_deleted_user_is_401(client: TestClient) -> None:
         "/api/users/me", headers={"Authorization": f"Bearer {issue_token(999, 'MEMBER')}"}
     )
     assert r.status_code == 401
+
+
+# --- 레드팀 2026-10-26: Apple 비정상 응답, JWKS 재요청, 토큰 위조 --------------------
+
+
+def _apple_instance() -> Any:
+    from app.identity.api.routes import apple_oauth
+    from app.main import app
+
+    return app.dependency_overrides[apple_oauth]()
+
+
+def _swap_transport(handler: Callable[[Any], Any]) -> Any:
+    import httpx
+
+    inst = _apple_instance()
+    inst._http = httpx.AsyncClient(transport=httpx.MockTransport(handler))
+    inst._jwks = {}
+    return inst
+
+
+@pytest.mark.parametrize(
+    "case", ["token_list", "id_token_int", "token_not_json", "jwk_broken", "keys_list"]
+)
+def test_malformed_apple_responses_are_401_not_500(
+    client: TestClient, fake_apple: FakeApple, case: str
+) -> None:
+    import httpx
+
+    from app.identity.infra.apple import KEYS_URL, TOKEN_URL
+
+    fake_apple.add_user("c-1", sub="s")
+    bad = {
+        "token_list": (TOKEN_URL, httpx.Response(200, json=[1])),
+        "id_token_int": (TOKEN_URL, httpx.Response(200, json={"id_token": 5})),
+        "token_not_json": (TOKEN_URL, httpx.Response(200, content=b"<html>")),
+        "jwk_broken": (KEYS_URL, httpx.Response(200, json={"keys": [{"kid": fake_apple.kid}]})),
+        "keys_list": (KEYS_URL, httpx.Response(200, json=[])),
+    }[case]
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        return bad[1] if req.url == bad[0] else fake_apple.handler(req)
+
+    _swap_transport(handler)
+    r = client.post(LOGIN, json=BODY)
+    assert r.status_code == 401 and r.json()["code"] == "OAUTH_CODE_INVALID"
+
+
+def test_unknown_kid_does_not_refetch_jwks_every_request(
+    client: TestClient, fake_apple: FakeApple
+) -> None:
+    import httpx
+
+    from app.identity.infra.apple import KEYS_URL
+
+    calls = {"keys": 0}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url == KEYS_URL:
+            calls["keys"] += 1
+        return fake_apple.handler(req)
+
+    _swap_transport(handler)
+    fake_apple.add_user("c-1", sub="s")
+    fake_apple.kid = "rotated-unknown"  # 토큰 헤더 kid ≠ JWKS kid 가 되게 아래서 다시 맞춘다
+    original = fake_apple.id_token
+    fake_apple.id_token = lambda claims, key=None: jwt.encode(  # type: ignore[method-assign]
+        claims, fake_apple.signing_key, algorithm="RS256", headers={"kid": "rogue"}
+    )
+    for _ in range(5):
+        assert client.post(LOGIN, json=BODY).status_code == 401
+    assert calls["keys"] == 1
+    fake_apple.id_token = original  # type: ignore[method-assign]
+
+
+def test_jwks_outage_uses_cached_key(client: TestClient, fake_apple: FakeApple) -> None:
+    import httpx
+
+    from app.identity.infra.apple import JWKS_TTL_SEC, KEYS_URL
+
+    now = [1_000_000.0]
+    inst = _apple_instance()
+    inst._clock = lambda: now[0]
+    fake_apple.add_user("c-1", sub="s")
+    fake_apple.add_user("c-2", sub="s")
+    assert client.post(LOGIN, json=BODY).status_code == 200  # 캐시 채움
+    now[0] += JWKS_TTL_SEC + 1  # 만료
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url == KEYS_URL:
+            return httpx.Response(503)
+        return fake_apple.handler(req)
+
+    jwks = inst._jwks
+    _swap_transport(handler)
+    inst._jwks = jwks
+    # client_secret 의 iat 는 가짜 시계 기준이지만 FakeApple 은 검사하지 않는다.
+    r = client.post(LOGIN, json={**BODY, "code": "c-2"})
+    assert r.status_code == 200
+
+
+def test_alg_none_and_hs256_confusion_rejected(client: TestClient, fake_apple: FakeApple) -> None:
+    import base64
+    import hmac
+    import json
+    import time
+    from hashlib import sha256
+
+    from app.core import security
+
+    fake_apple.add_user("c-1", sub="s")
+    uid = _login(client)["user"]["userId"]
+
+    def b64(d: dict) -> str:  # type: ignore[type-arg]
+        return base64.urlsafe_b64encode(json.dumps(d).encode()).rstrip(b"=").decode()
+
+    now = int(time.time())
+    claims = {"sub": str(uid), "iss": "mwonmal", "iat": now, "exp": now + 60, "role": "ADMIN"}
+    none_tok = f"{b64({'alg': 'none', 'kid': 'local-1'})}.{b64(claims)}."
+    signing = f"{b64({'alg': 'HS256', 'kid': 'local-1'})}.{b64(claims)}".encode()
+    mac = hmac.new(security._keys().public_pem, signing, sha256).digest()
+    hs_tok = signing.decode() + "." + base64.urlsafe_b64encode(mac).rstrip(b"=").decode()
+    for tok in (none_tok, hs_tok):
+        r = client.get("/api/users/me", headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 401
+
+
+def test_token_with_future_iat_or_without_exp_rejected(
+    client: TestClient, fake_apple: FakeApple
+) -> None:
+    import time
+
+    from app.core import security
+
+    fake_apple.add_user("c-1", sub="s")
+    uid = _login(client)["user"]["userId"]
+    future = issue_token(uid, "MEMBER", now=datetime.now(UTC) + timedelta(days=30))
+    k = security._keys()
+    no_exp = jwt.encode(
+        {"sub": str(uid), "iss": "mwonmal", "iat": int(time.time())},
+        k.private_pem,
+        algorithm="RS256",
+        headers={"kid": k.kid},
+    )
+    for tok in (future, no_exp):
+        r = client.get("/api/users/me", headers={"Authorization": f"Bearer {tok}"})
+        assert r.status_code == 401
+
+
+@pytest.mark.parametrize("code", ["", "   "])
+def test_empty_code_is_401_without_calling_apple(
+    client: TestClient, fake_apple: FakeApple, code: str
+) -> None:
+    # 계약 v1.0 OAuthLoginRequest.code 엔 minLength 가 없다 → 400 이 아니라 OAUTH_CODE_INVALID.
+    r = client.post(LOGIN, json={**BODY, "code": code})
+    assert r.status_code == 401 and r.json()["code"] == "OAUTH_CODE_INVALID"
+    assert fake_apple.token_requests == []
+
+
+def test_jwks_transient_failure_recovers_on_next_request(
+    client: TestClient, fake_apple: FakeApple
+) -> None:
+    import httpx
+
+    from app.identity.infra.apple import KEYS_URL
+
+    state = {"down": True}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url == KEYS_URL and state["down"]:
+            return httpx.Response(503)
+        return fake_apple.handler(req)
+
+    _swap_transport(handler)
+    fake_apple.add_user("c-1", sub="s")
+    fake_apple.add_user("c-2", sub="s")
+    assert client.post(LOGIN, json=BODY).status_code == 401
+    state["down"] = False
+    assert client.post(LOGIN, json={**BODY, "code": "c-2"}).status_code == 200

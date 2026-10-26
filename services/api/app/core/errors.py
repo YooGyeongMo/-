@@ -8,6 +8,7 @@ from enum import StrEnum
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.time import api_now
 
@@ -66,6 +67,14 @@ STATUS: dict[ErrorCode, int] = {
 }
 
 
+# 계약 v1.0 Error.code 목록에 없는 프레임워크 수준 실패. 그래도 모양은
+# Error{code, message, timestamp} 로 맞춘다(클라이언트가 한 가지 모양만 파싱하도록).
+# 계약 목록 추가는 v1.1 백로그.
+NOT_FOUND = "NOT_FOUND"
+METHOD_NOT_ALLOWED = "METHOD_NOT_ALLOWED"
+INTERNAL_ERROR = "INTERNAL_ERROR"
+
+
 def status_of(code: ErrorCode) -> int:
     return STATUS.get(code, 404)  # 나머지 *_NOT_FOUND 는 전부 404
 
@@ -78,8 +87,8 @@ class DomainError(Exception):
         self.field = field
 
 
-def error_body(code: ErrorCode, message: str, field: str | None = None) -> dict[str, str]:
-    body = {"code": code.value, "message": message, "timestamp": api_now()}
+def error_body(code: ErrorCode | str, message: str, field: str | None = None) -> dict[str, str]:
+    body = {"code": str(code), "message": message, "timestamp": api_now()}
     if field is not None:
         body["field"] = field
     return body
@@ -108,6 +117,30 @@ async def _validation_handler(_: Request, exc: Exception) -> JSONResponse:
     )
 
 
+async def _http_handler(_: Request, exc: Exception) -> JSONResponse:
+    # 라우팅 404·405, 본문 한도 413 등 Starlette 가 내는 HTTPException. 기본은 {"detail": ...}.
+    if not isinstance(exc, StarletteHTTPException):
+        raise exc
+    status = exc.status_code
+    if status == 404:
+        body = error_body(NOT_FOUND, "요청한 주소를 찾을 수 없어요.")
+    elif status == 405:
+        body = error_body(METHOD_NOT_ALLOWED, "지원하지 않는 요청 방식이에요.")
+    elif status == 413:
+        body = error_body(ErrorCode.FILE_TOO_LARGE, "요청이 너무 커요.")
+    elif status == 400:
+        body = error_body(ErrorCode.INVALID_INPUT, "입력값을 확인해 주세요.")
+    elif status == 401:
+        body = error_body(ErrorCode.UNAUTHORIZED, "로그인이 필요한 기능이에요.")
+    else:
+        body = error_body(
+            INTERNAL_ERROR if status >= 500 else "HTTP_ERROR", "요청을 처리할 수 없어요."
+        )
+    return JSONResponse(body, status_code=status, headers=exc.headers)
+
+
 def install(app: FastAPI) -> None:
     app.add_exception_handler(DomainError, _domain_handler)
     app.add_exception_handler(RequestValidationError, _validation_handler)
+    app.add_exception_handler(StarletteHTTPException, _http_handler)
+    # 처리 안 된 예외는 app.core.http.UnhandledErrorMiddleware 가 Error 봉투 500 으로 바꾼다.

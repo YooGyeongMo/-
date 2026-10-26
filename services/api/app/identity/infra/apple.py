@@ -23,6 +23,8 @@ APPLE_ISSUER = "https://appleid.apple.com"
 TOKEN_URL = f"{APPLE_ISSUER}/auth/token"
 KEYS_URL = f"{APPLE_ISSUER}/auth/keys"
 JWKS_TTL_SEC = 3600
+# 모르는 kid 로 JWKS 를 다시 받는 최소 간격. 없으면 요청마다 Apple 키 엔드포인트를 친다.
+JWKS_MIN_REFETCH_SEC = 60
 
 
 def _fail() -> DomainError:
@@ -48,6 +50,7 @@ class AppleOAuth:
         self._clock = clock
         self._jwks: dict[str, Any] = {}
         self._jwks_at = 0.0
+        self._jwks_tried_at = float("-inf")
 
     @property
     def configured(self) -> bool:
@@ -66,13 +69,26 @@ class AppleOAuth:
             claims, self._private_key, algorithm="ES256", headers={"kid": self._key_id}
         )
 
+    async def _refresh_jwks(self) -> None:
+        r = await self._http.get(KEYS_URL)
+        r.raise_for_status()
+        keys = r.json()["keys"]
+        self._jwks = {str(k["kid"]): k for k in keys}
+        # 성공한 갱신만 간격에 센다: 일시 장애 뒤엔 다음 요청이 바로 다시 받아 회복한다.
+        self._jwks_at = self._jwks_tried_at = self._clock()
+
     async def _jwk(self, kid: str) -> Any:
-        stale = self._clock() - self._jwks_at > JWKS_TTL_SEC
-        if stale or kid not in self._jwks:  # 모르는 kid = Apple 키 회전 → 다시 받는다
-            r = await self._http.get(KEYS_URL)
-            r.raise_for_status()
-            self._jwks = {k["kid"]: k for k in r.json()["keys"]}
-            self._jwks_at = self._clock()
+        now = self._clock()
+        stale = now - self._jwks_at > JWKS_TTL_SEC
+        # 모르는 kid = Apple 키 회전 → 다시 받는다. 단 최소 간격 안에서는 다시 치지 않는다.
+        unknown = kid not in self._jwks and now - self._jwks_tried_at >= JWKS_MIN_REFETCH_SEC
+        if stale or unknown:
+            try:
+                await self._refresh_jwks()
+            except (httpx.HTTPError, KeyError, TypeError, ValueError):
+                if kid not in self._jwks:
+                    raise
+                log.warning("apple_jwks_refresh_failed using_cached=true")
         if kid not in self._jwks:
             raise jwt.InvalidTokenError("unknown apple kid")
         return jwt.PyJWK(self._jwks[kid]).key
@@ -81,6 +97,8 @@ class AppleOAuth:
         if not self.configured:
             log.error("apple_oauth_not_configured")
             raise _fail()
+        if not code.strip():
+            raise _fail()  # 빈 code 는 Apple 에 보낼 필요도 없다
         try:
             r = await self._http.post(
                 TOKEN_URL,
@@ -109,11 +127,21 @@ class AppleOAuth:
                 options={"require": ["sub", "exp", "iat", "iss", "aud"]},
                 leeway=30,
             )
-        except (KeyError, ValueError, jwt.InvalidTokenError, httpx.HTTPError) as e:
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            AttributeError,
+            jwt.PyJWTError,  # InvalidTokenError + PyJWKError(키 모양 이상) 등
+            httpx.HTTPError,
+        ) as e:
             log.warning("apple_id_token_invalid type=%s", type(e).__name__)
             raise _fail() from e
 
-        sub = str(claims["sub"])
+        sub = claims["sub"]
+        if not isinstance(sub, str) or not sub:
+            log.warning("apple_id_token_invalid type=bad_sub")
+            raise _fail()
         # 이메일 공유를 거부해도 Apple 은 보통 릴레이 주소를 준다.
         # 그래도 없으면 sub 기반 자리표시자(users.email NOT NULL·unique).
         email = str(claims.get("email") or f"{sub}@apple.invalid")

@@ -6,8 +6,10 @@
 
 from collections.abc import AsyncIterator
 from functools import lru_cache
+from typing import Annotated
 
 import sqlalchemy as sa
+from fastapi import Depends
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -39,7 +41,9 @@ def now() -> sa.TextClause:
 
 @lru_cache(maxsize=1)
 def get_engine() -> AsyncEngine:
-    return create_async_engine(settings.database_url, pool_pre_ping=True)
+    # hide_parameters: DB 오류 메시지·로그에 바인드 값(이메일, 사용자 원문 등)을 싣지 않는다
+    # (ADR-0008 / REQ-14: 원문·개인정보는 로그에 남기지 않는다).
+    return create_async_engine(settings.database_url, pool_pre_ping=True, hide_parameters=True)
 
 
 async def ping(engine: AsyncEngine) -> bool:
@@ -60,3 +64,9 @@ async def session() -> AsyncIterator[AsyncSession]:
     """FastAPI 의존성. 요청 하나 = 트랜잭션 하나(14번 §6). 예외면 롤백, 아니면 커밋."""
     async with _sessionmaker()() as s, s.begin():
         yield s
+
+
+# 라우터는 반드시 이 별칭을 쓴다. scope="function" 이 없으면 FastAPI 는 yield 뒤(커밋)를
+# 응답을 보낸 다음에 실행한다 → 커밋이 실패해도 클라이언트는 이미 200 을 받는다.
+# 이 별칭은 핸들러가 끝나면 바로 커밋하고, 커밋이 실패하면 500 을 돌려준다.
+DbSession = Annotated[AsyncSession, Depends(session, scope="function")]

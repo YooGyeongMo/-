@@ -1,8 +1,27 @@
 {
-    admin 0.0.0.0:2019
+    # 관리 API 는 Caddy 컨테이너의 루프백에만 연다. 0.0.0.0 이면 같은 Docker 네트워크의 모든
+    # 컨테이너(api·minio·prism…)가 인증 없이 라우팅을 바꿔 전체 트래픽(Bearer 토큰 포함)을
+    # 빼돌릴 수 있었다(레드팀 2026-10-26, 실제로 재현). 블루그린 전환은 deploy/blue-green.sh 가
+    # `docker compose exec caddy caddy reload` 로 컨테이너 안에서 한다.
+    admin localhost:2019
 }
 :80 {
+    # JSON API 한도. 업로드 라우트(이미지 5MB·녹음 200MB)가 생기면 그 경로만 matcher 로 늘린다.
+    # 앱도 같은 한도를 건다(app.core.http.BodyLimitMiddleware) — 프록시를 거치지 않아도 막히게.
+    request_body {
+        max_size 1MB
+    }
+    header {
+        X-Request-Id {http.request.uuid}
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Content-Security-Policy "default-src 'none'; frame-ancestors 'none'"
+        # TLS 는 앞단(S5 Cloudflare)에서 끝난다. 브라우저는 HTTPS 응답의 HSTS 만 따른다.
+        Strict-Transport-Security "max-age=31536000"
+        -Server
+    }
     encode gzip
-    header X-Request-Id {http.request.uuid}
-    reverse_proxy api_blue:8080
+    # 활성 색은 MW_UPSTREAM 으로 정한다(compose 가 infra/.upstream 에서 읽음, 기본 blue).
+    reverse_proxy {$MW_UPSTREAM:api_blue:8080}
 }
