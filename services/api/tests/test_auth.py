@@ -325,3 +325,25 @@ def test_empty_code_is_401_without_calling_apple(
     r = client.post(LOGIN, json={**BODY, "code": code})
     assert r.status_code == 401 and r.json()["code"] == "OAUTH_CODE_INVALID"
     assert fake_apple.token_requests == []
+
+
+def test_jwks_transient_failure_recovers_on_next_request(
+    client: TestClient, fake_apple: FakeApple
+) -> None:
+    import httpx
+
+    from app.identity.infra.apple import KEYS_URL
+
+    state = {"down": True}
+
+    def handler(req: httpx.Request) -> httpx.Response:
+        if req.url == KEYS_URL and state["down"]:
+            return httpx.Response(503)
+        return fake_apple.handler(req)
+
+    _swap_transport(handler)
+    fake_apple.add_user("c-1", sub="s")
+    fake_apple.add_user("c-2", sub="s")
+    assert client.post(LOGIN, json=BODY).status_code == 401
+    state["down"] = False
+    assert client.post(LOGIN, json={**BODY, "code": "c-2"}).status_code == 200

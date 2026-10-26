@@ -70,12 +70,12 @@ class AppleOAuth:
         )
 
     async def _refresh_jwks(self) -> None:
-        self._jwks_tried_at = self._clock()
         r = await self._http.get(KEYS_URL)
         r.raise_for_status()
         keys = r.json()["keys"]
         self._jwks = {str(k["kid"]): k for k in keys}
-        self._jwks_at = self._clock()
+        # 성공한 갱신만 간격에 센다: 일시 장애 뒤엔 다음 요청이 바로 다시 받아 회복한다.
+        self._jwks_at = self._jwks_tried_at = self._clock()
 
     async def _jwk(self, kid: str) -> Any:
         now = self._clock()
