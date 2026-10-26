@@ -18,19 +18,53 @@
         }
       }
     },
-    "auth.signIn.apple": {
+    "auth.signIn.wordmark": {
       "extractionState": "manual",
       "localizations": {
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "Apple로 계속하기"
+            "value": "뭔말인교"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Continue with Apple"
+            "value": "Mwonmal"
+          }
+        }
+      }
+    },
+    "auth.signIn.subtitle": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "판교어를 한 겹씩 풀어드려요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Office jargon, unpacked one layer at a time"
+          }
+        }
+      }
+    },
+    "auth.signIn.failed": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "로그인에 실패했어요. 다시 시도해 주세요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sign-in failed. Please try again."
           }
         }
       }
