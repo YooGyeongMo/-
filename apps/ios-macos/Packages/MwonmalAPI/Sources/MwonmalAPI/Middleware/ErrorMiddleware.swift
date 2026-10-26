@@ -73,3 +73,15 @@ public struct ErrorMiddleware: ClientMiddleware {
         let field: String?
     }
 }
+
+/// 생성 클라이언트가 감싼 에러(`ClientError`)를 벗겨 가장 안쪽 원인을 돌려준다.
+/// Data가 `URLError`·`CancellationError`·`MwonmalServerError`를 구분할 때 쓴다(OpenAPIRuntime을 import하지 않고).
+public enum APIErrorCause {
+    public static func root(of error: any Error) -> any Error {
+        var current: any Error = error
+        while let wrapped = current as? ClientError {
+            current = wrapped.underlyingError
+        }
+        return current
+    }
+}

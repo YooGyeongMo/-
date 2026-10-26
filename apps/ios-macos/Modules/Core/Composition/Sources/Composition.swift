@@ -1,4 +1,5 @@
 import AuthFeature
+import Domain
 import HomeFeature
 import Routing
 import SettingsFeature
@@ -70,10 +71,38 @@ extension AppTab {
     }
 }
 
-/// 로그인 전 화면 미리보기용.
-public struct SignedOutRootView: View {
-    public init() {}
+/// 세션 상태에 따라 로그인 화면과 탭 루트를 고른다. 화면 자체는 Day 5(#9)에서 S-01로 교체.
+public struct SessionRootView: View {
+    @State private var session: AppSession
+
+    public init(session: AppSession = .live()) {
+        _session = State(initialValue: session)
+    }
+
     public var body: some View {
-        AuthRootView()
+        Group {
+            switch session.state {
+            case .none:
+                ProgressView()
+            case .signedOut:
+                AuthRootView(isSigningIn: session.isSigningIn, errorMessage: session.lastError?.userMessage) {
+                    session.signIn()
+                }
+            case .signedIn, .unverified:
+                AppRootView()
+            }
+        }
+        .task { await session.start().value }
+    }
+}
+
+extension DomainError {
+    /// 서버가 준 사용자용 문구. 없으면 nil이고 화면이 기본 문구(String Catalog)를 쓴다.
+    var userMessage: String? {
+        switch self {
+        case let .signInFailed(message), let .emailAlreadyRegistered(message): message
+        case let .server(_, message): message
+        default: nil
+        }
     }
 }

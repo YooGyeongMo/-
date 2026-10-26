@@ -4,7 +4,7 @@ import SwiftUI
 @main
 struct MwonmalMacApp: App {
     var body: some Scene {
-        WindowGroup { AppRootView() }
+        WindowGroup { SessionRootView() }
             .defaultSize(width: 1200, height: 800)
     }
 }

@@ -38,7 +38,7 @@ let coreTargets: [Target] =
             ),
         ]
         + coreModule("Platform", deps: ["Domain"])
-        + coreModule("Data", deps: ["Domain", "Platform", "MwonmalAPI"])
+        + coreModule("Data", deps: ["Domain", "Platform", "MwonmalAPI"], testDeps: ["Domain", "MwonmalAPI"])
         + coreModule("MwonmalUI", hasResources: true, mainActorByDefault: true, testsUseDomainTesting: false)
         + coreModule("Routing", layer: .routing, deps: ["Domain"], mainActorByDefault: true)
         + coreModule("FeatureKit", layer: .routing, deps: ["Domain", "MwonmalUI", "Routing"], mainActorByDefault: true)
@@ -53,10 +53,18 @@ let composition: [Target] = coreModule(
 
 let appInfo: [String: Plist.Value] = [
     "CFBundleDisplayName": "뭔말인교?",
+    // 서버 주소는 빌드 설정에서(Debug = 로컬 Caddy, Release = 운영). 로컬 http는 ATS 로컬 네트워크 예외로만.
+    "MWAPIBaseURL": "$(MW_API_BASE_URL)",
+    "NSAppTransportSecurity": ["NSAllowsLocalNetworking": true],
     "CFBundleLocalizations": ["ko", "en"],
     "NSMicrophoneUsageDescription": "회의를 녹음해 받아쓰기와 해석에 씁니다.",
     "NSSpeechRecognitionUsageDescription": "녹음 중 실시간 받아쓰기 미리보기에 씁니다.",
 ]
+
+let apiSettings: Settings = .settings(configurations: [
+    .debug(name: .debug, settings: ["MW_API_BASE_URL": "http://localhost:8080/api"]),
+    .release(name: .release, settings: ["MW_API_BASE_URL": "https://api.mwonmalingyo.kr/api"]),
+])
 
 let apps: [Target] = [
     .target(
@@ -67,7 +75,9 @@ let apps: [Target] = [
         deploymentTargets: .iOS("17.0"),
         infoPlist: .extendingDefault(with: appInfo.merging(["UILaunchScreen": [:]]) { $1 }),
         sources: ["Apps/IOS/Sources/**"],
-        dependencies: [.target(name: "Composition")]
+        entitlements: .file(path: "Apps/IOS/Mwonmal.entitlements"),
+        dependencies: [.target(name: "Composition")],
+        settings: apiSettings
     ),
     .target(
         name: "MwonmalMac",
@@ -78,7 +88,8 @@ let apps: [Target] = [
         infoPlist: .extendingDefault(with: appInfo),
         sources: ["Apps/Mac/Sources/**"],
         entitlements: .file(path: "Apps/Mac/Mwonmal.entitlements"),
-        dependencies: [.target(name: "Composition")]
+        dependencies: [.target(name: "Composition")],
+        settings: apiSettings
     ),
     .target(
         name: "MwonmalUICatalog",
