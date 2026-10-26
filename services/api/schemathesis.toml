@@ -1,0 +1,16 @@
+# 계약 검증(CI server.yml contract job). 계약 v1.0 은 고정, 아래는 ADR-0014 §5 의 "알려진 차이" 만 끈다.
+# 차이가 해소되면(v1.1) 해당 블록을 지운다. 그 밖의 위반은 전부 CI 실패.
+
+# 1) timestamp·createdAt 이 오프셋 없는 KST → RFC 3339 date-time 형식 위반 (v1.1 #75 에서 +09:00).
+#    형식(format) 검사만 끄고 타입·필수 필드·enum 검사는 유지한다.
+[checks.response_schema_conformance]
+validate-formats = false
+
+# 2) PATCH /users/me(updateMe)는 v1.1 → OPTIONS 의 Allow 에 PATCH 없음.
+#    `--checks all` 이 설정 파일의 enabled=false 를 덮어써서, CI 명령에서
+#    `--exclude-checks allow_header_conformance` 로 끈다(server.yml contract job).
+
+# 3) provider=kakao·google 은 v1.0 미구현 → 400 (ADR-0013). apple 만 값으로 쓴다.
+[[operations]]
+include-operation-id = "oauthLogin"
+parameters = { provider = "apple" }

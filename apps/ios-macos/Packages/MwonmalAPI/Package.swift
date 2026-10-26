@@ -8,7 +8,8 @@ let package = Package(
     name: "MwonmalAPI",
     platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
-        .library(name: "MwonmalAPI", targets: ["MwonmalAPI"]),
+        // 동적: Tuist 개발 모드(동적 프레임워크)에서 Data가 OpenAPIRuntime 심볼까지 한 이미지에서 찾게 한다.
+        .library(name: "MwonmalAPI", type: .dynamic, targets: ["MwonmalAPI"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-openapi-generator", .upToNextMinor(from: "1.14.2")),

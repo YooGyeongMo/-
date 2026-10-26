@@ -4,6 +4,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import DomainError, ErrorCode
 from app.identity.domain.model import Account, LevelInfo, OAuthIdentity
 from app.identity.infra.models import User
 
@@ -82,10 +83,25 @@ class SqlAccountRepository:
                 self._s.add(user)
                 await self._s.flush()
         except IntegrityError:
+            # MySQL 기본 격리(REPEATABLE READ)에선 이 트랜잭션이 앞서 읽은 스냅숏 때문에 평범한
+            # SELECT 로는 방금 커밋된 상대 행이 안 보인다 → 잠금 읽기(FOR SHARE)로 최신 커밋을 본다.
             # 같은 사람의 첫 로그인이 동시에 두 번 → 먼저 들어간 행을 쓴다.
-            existing = await self.by_provider(identity.provider, identity.provider_id)
-            if existing is None:
-                raise
-            return existing, False
+            existing = await self._one(
+                sa.select(User)
+                .where(User.provider == identity.provider, User.provider_id == identity.provider_id)
+                .with_for_update(read=True)
+            )
+            if existing is not None:
+                return existing, False
+            # 다른 계정이 같은 이메일로 막 가입했다 → 순차 경로와 같은 409.
+            taken = await self._one(
+                sa.select(User).where(User.email == identity.email).with_for_update(read=True)
+            )
+            if taken is not None:
+                raise DomainError(
+                    ErrorCode.EMAIL_ALREADY_REGISTERED,
+                    "이미 다른 방법으로 가입한 이메일이에요. 처음 가입한 방법으로 로그인해 주세요.",
+                ) from None
+            raise
         await self._s.refresh(user)  # server_default(created_at 등) 읽기
         return await self._to_account(user), True

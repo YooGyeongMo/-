@@ -65,7 +65,8 @@ public func coreModule(
     deploymentTargets: DeploymentTargets = minimumOS,
     hasResources: Bool = false,
     mainActorByDefault: Bool = false,
-    testsUseDomainTesting: Bool = true
+    testsUseDomainTesting: Bool = true,
+    testDeps: [String] = []
 ) -> [Target] {
     validate(name, layer: layer, deps: deps)
     let root = "Modules/Core/\(name)"
@@ -89,7 +90,8 @@ public func coreModule(
             bundleId: "kr.mwonmal.\(name.lowercased()).tests",
             deploymentTargets: minimumOS,
             sources: ["\(root)/Tests/**"],
-            dependencies: [.target(name: name)] + (testsUseDomainTesting ? [.target(name: "DomainTesting")] : []),
+            dependencies: [.target(name: name)] + (testsUseDomainTesting ? [.target(name: "DomainTesting")] : [])
+                + testDeps.map(dependency),
             settings: isolationSettings(mainActorByDefault),
             metadata: .metadata(tags: ["layer:\(layer.rawValue)", "kind:tests"])
         ),

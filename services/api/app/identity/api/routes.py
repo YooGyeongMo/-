@@ -5,11 +5,10 @@ from typing import Annotated, Any, Literal
 
 import httpx
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel, Field
-from sqlalchemy.ext.asyncio import AsyncSession
+from pydantic import BaseModel
 
 from app.core.auth import CurrentPrincipal
-from app.core.db import session
+from app.core.db import DbSession
 from app.core.errors import DomainError, ErrorCode
 from app.core.security import issue_token
 from app.core.settings import settings
@@ -21,8 +20,6 @@ from app.identity.usecases.login import login
 from app.identity.usecases.me import get_me
 
 router = APIRouter(prefix="/api")
-
-Session = Annotated[AsyncSession, Depends(session)]
 
 
 @lru_cache(maxsize=1)
@@ -47,8 +44,9 @@ def oauth_provider(
 
 
 class OAuthLoginRequest(BaseModel):
-    code: str = Field(min_length=1)
-    redirectUri: str = Field(min_length=1)  # noqa: N815 - 계약 필드 이름 그대로
+    # 계약 v1.0 은 minLength 가 없다 → 빈 code 는 400 이 아니라 "틀린 code"(401, Apple 호출 없음).
+    code: str
+    redirectUri: str  # noqa: N815 - 계약 필드 이름 그대로
 
 
 def user_response(a: Account) -> dict[str, Any]:
@@ -82,7 +80,7 @@ def user_response(a: Account) -> dict[str, Any]:
 async def oauth_login(
     body: OAuthLoginRequest,
     oauth: Annotated[OAuthProvider, Depends(oauth_provider)],
-    db: Session,
+    db: DbSession,
 ) -> dict[str, Any]:
     result = await login(
         code=body.code,
@@ -100,5 +98,5 @@ async def oauth_login(
 
 
 @router.get("/users/me")
-async def users_me(principal: CurrentPrincipal, db: Session) -> dict[str, Any]:
+async def users_me(principal: CurrentPrincipal, db: DbSession) -> dict[str, Any]:
     return user_response(await get_me(user_id=principal.user_id, repo=SqlAccountRepository(db)))
