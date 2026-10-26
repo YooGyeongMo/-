@@ -1,3 +1,4 @@
+import CoreGraphics
 @testable import MwonmalUI
 import Testing
 
@@ -127,6 +128,20 @@ struct LoginHeroLayoutTests {
                 #expect(UIImage(named: name, in: .module, compatibleWith: nil) != nil, "\(name)")
             }
             #expect(UIColor(named: "LoginHeroSky", in: .module, compatibleWith: nil) != nil)
+        }
+    #endif
+}
+
+struct MwFontTests {
+    @Test("Pretendard 3종(Regular·SemiBold·ExtraBold)이 번들에 있고 등록된다") func registers() {
+        #expect(MwFont.registered)
+    }
+
+    #if canImport(UIKit)
+        @Test("등록 뒤 이름으로 찾을 수 있다", arguments: MwFont.Weight.allCases)
+        func resolves(weight: MwFont.Weight) {
+            _ = MwFont.registered
+            #expect(UIFont(name: weight.rawValue, size: 17) != nil)
         }
     #endif
 }

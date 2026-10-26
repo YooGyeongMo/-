@@ -50,13 +50,14 @@ public struct LoginHeroIllustration: View {
     static let ground = CGRect(x: -20, y: 353.9, width: 433, height: 136.1)
 
     /// 뒤에 있는 것부터. 크기는 내려받은 PDF의 실제 크기(획 두께 포함),
-    /// 위치는 Figma 통짜 렌더와 픽셀 매칭으로 맞췄다(0.25pt 단위).
+    /// 위치는 Figma 3배 렌더와 앱 화면을 겹쳐 서브픽셀까지 맞췄다(오차 < 0.05pt).
+    /// 인물은 Figma에서 좌우 반전된 그룹이라 노드 좌표(51:487 x 268)와 실제 그림 위치가 다르다.
     static let layers: [Layer] = [
         Layer(name: "LoginHeroSun", frame: CGRect(x: 26, y: 66, width: 88, height: 88)), // 51:472·473
         Layer(name: "LoginHeroBubbles", frame: CGRect(x: 112, y: 170, width: 202, height: 190)), // 51:479
-        Layer(name: "LoginHeroPersonSitting", frame: CGRect(x: 229.5, y: 146.75, width: 39.045, height: 73.227)), // 51:487
-        Layer(name: "LoginHeroPersonPhone", frame: CGRect(x: 137, y: 325.5, width: 33.081, height: 76.7)), // 51:496
-        Layer(name: "LoginHeroPersonWave", frame: CGRect(x: 287.5, y: 320, width: 29.201, height: 86)), // 51:507
+        Layer(name: "LoginHeroPersonSitting", frame: CGRect(x: 229.34, y: 146.75, width: 39.045, height: 73.227)), // 51:487
+        Layer(name: "LoginHeroPersonPhone", frame: CGRect(x: 136.94, y: 325.32, width: 33.081, height: 76.7)), // 51:496
+        Layer(name: "LoginHeroPersonWave", frame: CGRect(x: 287.3, y: 320, width: 29.201, height: 86)), // 51:507
     ]
 
     /// 너비와 높이 중 빡빡한 쪽에 맞춘다. 남는 쪽은 하늘과 땅이 채운다.

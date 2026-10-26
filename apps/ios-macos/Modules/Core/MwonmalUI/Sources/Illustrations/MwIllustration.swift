@@ -6,4 +6,13 @@ public enum MwIllustration {
     public static var loginHero: some View {
         LoginHeroIllustration()
     }
+
+    /// 종이 질감(Figma 51:561). 160×160 노이즈 한 장, 레이어 불투명도 16%. 크기는 호출하는 쪽이 정한다.
+    public static var paperGrain: some View {
+        Image("PaperGrain", bundle: .module)
+            .resizable()
+            .opacity(0.16)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
+    }
 }
