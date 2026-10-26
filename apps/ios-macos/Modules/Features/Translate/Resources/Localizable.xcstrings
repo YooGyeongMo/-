@@ -1,0 +1,23 @@
+{
+  "sourceLanguage": "ko",
+  "strings": {
+    "translate.root.placeholder": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "판교어 해석"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decode jargon"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

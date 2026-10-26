@@ -2,7 +2,7 @@
 
 | 항목 | 값 |
 |---|---|
-| 상태 | 채택 (2026-09-21) |
+| 상태 | 채택 (2026-09-21) · **개정 2026-10-26 → ADR-0016**: `TabCoordinator` → `Routing.AppRouter`(같은 역할: 탭·탭별 경로, 창 수명 `@State`), 탭 enum은 SwiftUI `Tab`(iOS 18)과 겹쳐 `AppTab`. `AdaptiveRoot`는 Routing에 제네릭으로(v1.3) |
 | 관련 REQ | REQ-01(iPad = 넓은 레이아웃), REQ-03(최소~최대 화면, 고정 px 금지), REQ-02 |
 | 관련 결정 | 12번 D-0·D-2 **개정**, D-17 교체("루트 뷰는 하나" → "루트 래퍼 하나, 구현 둘"), D-20 유지, D-21, FD-2, MI-1·2·3·6, iOS-C1, PM S1-A·S1-B, RT-A-08·09·10·19, RT-B-05 |
 | 출처 | `council/S0/macOS_iPad.md` §0·MI-1~MI-6, `council/S0/iOS.md` 과제 C, `council/S0/REDTEAM_A.md` RT-A-08~10·§B #1·#4·#16·#26 |
