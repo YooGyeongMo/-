@@ -39,3 +39,52 @@ async def test_create_twice_returns_existing(tmp_path: Path, backend: str) -> No
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+async def _fresh(url: str):  # type: ignore[no-untyped-def]
+    engine = create_async_engine(url)
+    async with engine.begin() as conn:
+        await conn.run_sync(metadata.drop_all)
+        await conn.run_sync(metadata.create_all)
+    return engine
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("other", "expect"),
+    [
+        # 같은 Apple 계정의 첫 로그인 두 개가 겹침 → 늦은 쪽도 같은 계정을 받는다.
+        (OAuthIdentity(provider="APPLE", provider_id="same", email="s@x.com"), "same"),
+        # 다른 Apple 계정이 같은 이메일로 먼저 커밋 → 순차 경로와 같은 409.
+        (OAuthIdentity(provider="APPLE", provider_id="other", email="s@x.com"), "409"),
+    ],
+)
+async def test_real_race_on_mysql(other: OAuthIdentity, expect: str) -> None:
+    """두 트랜잭션이 실제로 겹친다. MySQL 기본 격리(REPEATABLE READ)에선 먼저 읽은 스냅숏 때문에
+    IntegrityError 뒤의 평범한 SELECT 가 상대 행을 못 본다 → 잠금 읽기로 최신 커밋을 봐야 한다."""
+    url = os.environ.get("MWONMAL_TEST_MYSQL_URL", "")
+    if not url:
+        pytest.skip("MWONMAL_TEST_MYSQL_URL 없음")
+    from app.core.errors import DomainError
+
+    engine = await _fresh(url)
+    maker = async_sessionmaker(engine, expire_on_commit=False)
+    me = OAuthIdentity(provider="APPLE", provider_id="same", email="s@x.com")
+    try:
+        async with maker() as a, a.begin():
+            repo_a = SqlAccountRepository(a)
+            assert await repo_a.by_provider("APPLE", "same") is None  # 스냅숏 시작
+            assert await repo_a.by_email("s@x.com") is None
+            async with maker() as b, b.begin():
+                winner, _ = await SqlAccountRepository(b).create(other, "닉B")
+            if expect == "same":
+                got, created = await repo_a.create(me, "닉A")
+                assert created is False and got.id == winner.id
+            else:
+                with pytest.raises(DomainError) as e:
+                    await repo_a.create(me, "닉A")
+                assert e.value.code.value == "EMAIL_ALREADY_REGISTERED"
+    finally:
+        async with engine.begin() as conn:
+            await conn.run_sync(metadata.drop_all)
+        await engine.dispose()
