@@ -4,7 +4,7 @@
 > 대화 기록은 길어지면 자동 요약되어 세부가 날아간다. 그래서 중요한 것은 전부 여기와 `docs/` 아래, 그리고 GitHub 이슈에 있다.
 > 세션이 끝날 때마다 이 파일을 갱신한다(`/mw-save`). 새 세션은 `/mw` 로 이 파일부터 읽는다.
 
-**마지막 갱신**: 2026-10-27 · **main**: PR #114(서버 해석)·#116(앱 해석) 머지 대상 · **CI**: 확인 후 머지
+**마지막 갱신**: 2026-10-27 · **main**: #114·#116 머지됨, DB 단계화·성능·면접 문서 PR 진행 · **CI**: PR에서 확인 후 머지
 
 ---
 
@@ -57,7 +57,8 @@
 | 궁금한 것 | 파일 |
 |---|---|
 | 요구사항 | `docs/REQUIREMENTS.md` |
-| 왜 그렇게 정했나 | `docs/adr/0001~0019` |
+| 왜 그렇게 정했나 | `docs/adr/0001~0022` (0021 DB 단계화·SQL 예산, 0022 앱 네트워크·캐시·실시간) |
+| 면접 대비(코드 기준 Q&A) | `docs/interview/2026-10-27-ios-backend-interview.md` (+ 같은 이름 PDF) |
 | 앱 구조 | ADR-0016 + `apps/ios-macos/Tuist/ProjectDescriptionHelpers/Module.swift` (12번 문서의 Coordinator 서술은 개정 전 기록) |
 | 디자인 토큰·글래스 | ADR-0017, `Modules/Core/MwonmalUI/Resources/Colors.xcassets` |
 | 서버·AI·비용 | `docs/design/14_시스템_설계서.md`, ADR-0015 |
@@ -76,6 +77,10 @@ claude --resume 3709399e-b05f-475b-94d3-f593771c009a   # 이 대화 이어가기
 - 서버 해석 API(PR #114), 앱 해석 화면 + E2E(PR #116). 레드팀 3라운드 기록 `docs/lessons/2026-10-27-decode-redteam.md`.
 - 로컬 실행: `cd services/api && uv run python scripts/dev_server.py --fresh` → 앱 Debug 실행 인자 `-MWDevLogin <이름>`(+ `-MWResetSession`).
 - E2E: `xcodebuild test -scheme MwonmalE2E`(서버 켜 둔 상태).
+- **DB 단계화(ADR-0021)**: v1.0 DB는 8테이블. 나머지 9개는 `services/api/migrations/staged/`. 기능을 열 때 초안을 `versions/`로 옮기고 `app/core/schema.py` `ACTIVE_TABLES`에 이름 추가. 지연 표를 쓰는 코드는 `schema.has(...)` 게이트 필수.
+- **성능**: 요청당 SQL POST 6·상세 3·목록 2·할 일 2·프로젝트 3·용어 3. 측정 `uv run python scripts/bench.py`.
+- **앱**: `@ViewModelState`(화면 모델 한 번만 생성), 앱 전용 URLSession(캐시·쿠키 끔), `AppSession.endSession` 한 곳에서 로그아웃 정리.
+- **열린 결정**: Alamofire 전송 교체 여부 — ADR-0022는 "현행 유지, 조건 오면 전송 계층만" 권고. 사용자 최종 결정 대기.
 
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)
 
