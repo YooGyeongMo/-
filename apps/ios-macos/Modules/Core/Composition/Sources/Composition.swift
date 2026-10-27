@@ -13,8 +13,8 @@ public enum CompositionModule {
     public static let name = "Composition"
 }
 
-/// 앱 루트(로그인 뒤). v1.0은 iPhone 탭 구조(Figma 플로팅 탭 바: 홈·프로젝트·복습·MY).
-/// wide(iPad·Mac)는 v1.3·v1.4에서 AdaptiveRoot로(ADR-0006).
+/// 앱 루트(로그인 뒤). 좁은 화면 = iPhone 탭 구조(Figma 플로팅 탭 바: 홈·프로젝트·복습·MY),
+/// 넓은 화면(Mac·iPad 전체화면) = 사이드바 + 상세(ADR-0006). 상태(라우터·토스트·동의)는 하나다.
 struct AppRootView: View {
     let session: AppSession
     /// `@State var router = AppRouter()`는 이 뷰가 다시 만들어질 때마다 라우터를 새로 만들고 버린다 → 한 번만.
@@ -25,6 +25,7 @@ struct AppRootView: View {
     /// 방금 해석한 결과는 다시 받지 않고 바로 보여 준다.
     @State private var prefetched: Domain.Translation?
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwLayout) private var layout
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var bottomInset: CGFloat = 0
 
@@ -33,35 +34,79 @@ struct AppRootView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            TabView(selection: $router.selectedTab) {
-                ForEach(AppTab.allCases, id: \.self) { tab in
-                    NavigationStack(path: binding(for: tab)) {
-                        root(for: tab)
-                            .navigationDestination(for: AppRoute.self) { route in
-                                switch route {
-                                case let .result(id):
-                                    ResultSheet(translationId: id, dependencies: translate, onChange: router.dataChanged, onNotice: show)
-                                }
-                            }
-                        #if os(iOS)
-                            .toolbar(.hidden, for: .navigationBar)
-                        #endif
+        Group {
+            if layout == .wide {
+                wideRoot
+            } else {
+                compactRoot
+            }
+        }
+        .environment(router)
+        .focusedSceneValue(\.mwRouter, router)
+        .sheet(item: modalSheet, onDismiss: {
+            if layout == .compact {
+                prefetched = nil
+            }
+        }, content: { sheet in
+            if layout == .compact {
+                sheetContent(sheet)
+                    .sheet(item: Binding(get: { router.sheetOverSheet }, set: { router.sheetOverSheet = $0 })) { over in
+                        sheetContent(over).presentationDetents([.medium, .large])
                     }
-                    .tag(tab)
+            } else {
+                sheetContent(sheet).frame(minWidth: 480, idealWidth: 560, minHeight: 560, idealHeight: 720)
+            }
+        })
+        .task { aiConsent = await session.consent.isGranted() }
+        .onChange(of: router.sheet) { _, sheet in
+            if sheet == nil, layout == .wide {
+                prefetched = nil
+            }
+            Task { aiConsent = await session.consent.isGranted() }
+        }
+        // 설정은 붙여넣기 위에 겹쳐 뜬다 → 닫힐 때도 동의를 다시 읽는다(QA 2차 R1).
+        .onChange(of: router.sheetOverSheet) { _, _ in Task { aiConsent = await session.consent.isGranted() } }
+        .onChange(of: router.dataVersion) { _, _ in Task { await session.reloadProfile() } }
+    }
+
+    /// 모달로 띄울 시트. 좁은 화면은 라우터의 시트 그대로, 넓은 화면은 붙여넣기·결과를 상세 영역에 그리므로
+    /// 그 위에 겹친 것(용어·설정)이나 처음부터 모달인 것만.
+    private var modalSheet: Binding<AppSheet?> {
+        Binding(
+            get: {
+                guard layout == .wide else { return router.sheet }
+                if let over = router.sheetOverSheet {
+                    return over
+                }
+                return router.sheet.flatMap { $0.isInlineOnWide ? nil : $0 }
+            },
+            set: { new in
+                guard new == nil else { return }
+                if layout == .wide, router.sheetOverSheet != nil {
+                    router.sheetOverSheet = nil
+                } else {
+                    router.sheet = nil
+                }
+            }
+        )
+    }
+
+    private var compactRoot: some View {
+        ZStack(alignment: .bottom) {
+            TabView(selection: Binding(get: { router.selectedTab }, set: { router.selectedTab = $0 })) {
+                ForEach(AppTab.allCases, id: \.self) { tab in
+                    stack(for: tab)
+                        .tag(tab)
                     #if os(iOS)
                         .toolbar(.hidden, for: .tabBar)
                     #endif
                 }
             }
-            MwTabBar(items: tabItems, selection: $router.selectedTab)
+            MwTabBar(items: tabItems, selection: Binding(get: { router.selectedTab }, set: { router.selectedTab = $0 }))
                 // Figma: 탭 바 아래 끝 = 화면(기기) 아래 끝에서 26. 안전 영역(홈 인디케이터 34)을 빼고 내린다.
                 .offset(y: bottomInset - 26 * scale)
             if let toast, router.sheet == nil {
-                MwToast(Text(toast, bundle: .module))
-                    .padding(.bottom, 110 * scale)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .accessibilityIdentifier("toast")
+                toastView(toast).padding(.bottom, 110 * scale)
             }
         }
         .ignoresSafeArea(.keyboard)
@@ -71,18 +116,54 @@ struct AppRootView: View {
                 bottomInset = inset
             }
         }
-        .environment(router)
-        .sheet(item: Binding(get: { router.sheet }, set: { router.sheet = $0 }), onDismiss: { prefetched = nil }, content: { sheet in
-            sheetContent(sheet)
-                .sheet(item: Binding(get: { router.sheetOverSheet }, set: { router.sheetOverSheet = $0 })) { over in
-                    sheetContent(over).presentationDetents([.medium, .large])
+    }
+
+    /// 넓은 화면: 사이드바(시스템) + 상세. 붙여넣기·결과는 상세 영역의 페이지(웹 W-01·W-03).
+    private var wideRoot: some View {
+        NavigationSplitView {
+            WideSidebar(
+                selection: Binding(get: { router.selectedTab }, set: { tab in
+                    router.sheet = nil // 다른 탭을 고르면 열려 있던 붙여넣기·결과 페이지를 닫는다
+                    router.select(tab)
+                }),
+                user: session.user,
+                onCompose: { router.present(.compose) }
+            )
+            .navigationSplitViewColumnWidth(min: 220, ideal: 248, max: 300)
+        } detail: {
+            ZStack(alignment: .bottom) {
+                if let sheet = router.sheet, sheet.isInlineOnWide {
+                    sheetContent(sheet).id(sheet.id)
+                } else {
+                    stack(for: router.selectedTab).id(router.selectedTab)
                 }
-        })
-        .task { aiConsent = await session.consent.isGranted() }
-        .onChange(of: router.sheet) { _, _ in Task { aiConsent = await session.consent.isGranted() } }
-        // 설정은 붙여넣기 위에 겹쳐 뜬다 → 닫힐 때도 동의를 다시 읽는다(QA 2차 R1).
-        .onChange(of: router.sheetOverSheet) { _, _ in Task { aiConsent = await session.consent.isGranted() } }
-        .onChange(of: router.dataVersion) { _, _ in Task { await session.reloadProfile() } }
+                if let toast, router.sheetOverSheet == nil {
+                    toastView(toast).padding(.bottom, 32)
+                }
+            }
+            .background(MwColor.canvas.ignoresSafeArea())
+        }
+    }
+
+    private func stack(for tab: AppTab) -> some View {
+        NavigationStack(path: binding(for: tab)) {
+            root(for: tab)
+                .navigationDestination(for: AppRoute.self) { route in
+                    switch route {
+                    case let .result(id):
+                        ResultSheet(translationId: id, dependencies: translate, onChange: router.dataChanged, onNotice: show)
+                    }
+                }
+            #if os(iOS)
+                .toolbar(.hidden, for: .navigationBar)
+            #endif
+        }
+    }
+
+    private func toastView(_ key: LocalizedStringKey) -> some View {
+        MwToast(Text(key, bundle: .module))
+            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .accessibilityIdentifier("toast")
     }
 
     @ViewBuilder private func root(for tab: AppTab) -> some View {
@@ -136,10 +217,11 @@ struct AppRootView: View {
         }
         .environment(router)
         .environment(\.mwScale, scale)
+        .environment(\.mwLayout, sheet.isInlineOnWide ? layout : .compact) // 모달 안은 늘 시트 모양
         .presentationCornerRadius(32 * scale)
         .presentationDragIndicator(.hidden)
         .overlay(alignment: .bottom) {
-            if let toast {
+            if let toast, !(layout == .wide && sheet.isInlineOnWide) {
                 MwToast(Text(toast, bundle: .module)).padding(.bottom, 24 * scale).allowsHitTesting(false)
             }
         }
@@ -209,8 +291,10 @@ public struct SessionRootView: View {
             case .none:
                 ProgressView()
             case .signedOut:
-                AuthRootView(isSigningIn: session.isSigningIn, errorMessage: session.lastError.flatMap(\.userMessage)) {
-                    session.signInWithApple()
+                AuthContainer {
+                    AuthRootView(isSigningIn: session.isSigningIn, errorMessage: session.lastError.flatMap(\.userMessage)) {
+                        session.signInWithApple()
+                    }
                 }
             case .signedIn, .unverified:
                 AppRootView(session: session)
@@ -218,6 +302,26 @@ public struct SessionRootView: View {
         }
         .mwScaledToWidth()
         .task { await session.start().value }
+    }
+}
+
+/// 로그인 화면은 iPhone 한 장 그림(S-01)이라 넓은 화면에서는 가운데 기기 폭(393pt) 기둥으로 보여 준다.
+private struct AuthContainer<Content: View>: View {
+    @ViewBuilder let content: Content
+    @Environment(\.mwLayout) private var layout
+
+    var body: some View {
+        if layout == .wide {
+            content
+                .environment(\.mwLayout, .compact)
+                .frame(maxWidth: MwFrame.width)
+                .clipShape(RoundedRectangle(cornerRadius: 32, style: .circular))
+                .padding(.vertical, 24)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(MwColor.brandPanel.ignoresSafeArea())
+        } else {
+            content
+        }
     }
 }
 

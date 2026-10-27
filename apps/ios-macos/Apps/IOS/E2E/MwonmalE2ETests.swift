@@ -80,9 +80,16 @@ final class MwonmalE2ETests: XCTestCase {
         shot("06-result-checked")
 
         // 용어 시트(칩)
-        let chip = app.buttons.matching(NSPredicate(format: "label BEGINSWITH '얼라인'")).firstMatch
+        let chip = app.buttons.matching(NSPredicate(format: "identifier == 'result.term' AND label BEGINSWITH '얼라인'")).firstMatch
         wait(chip)
+        // 작은 화면(SE)에서는 칩이 아래 고정 버튼 밑에 있다 → 사용자처럼 올려서 누른다.
+        for _ in 0 ..< 3 where !chip.isHittable {
+            app.swipeUp()
+            Thread.sleep(forTimeInterval: 1) // 관성 스크롤이 멈춘 뒤 누른다(멈추기 전 탭은 빗나간다)
+        }
         chip.tap()
+        // "방향 맞추기"는 결과 화면(쉬운 말)에도 있어서 용어 창이 떴는지는 닫기 버튼으로 본다.
+        wait(app.buttons["term.close"])
         wait(app.staticTexts["방향 맞추기"])
         shot("07-term")
         app.buttons["term.close"].tap()

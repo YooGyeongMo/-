@@ -33,8 +33,20 @@ public struct DetectedTerm: Sendable, Equatable, Hashable {
     public let startIndex: Int
     public let endIndex: Int
     public let inMyCards: Bool
+    /// 이 말이 판교어일 확률(0~1). 사전에서 찾으면 1에 가깝고, 사전 밖에서 앞뒤 문맥으로 찾은 말(서버 문맥 모델)은
+    /// 모델 확률이다(계약 `DetectedTerm.confidence`).
+    public let confidence: Double
 
-    public init(termId: Int64?, termKo: String, plainKo: String, matchedText: String, startIndex: Int, endIndex: Int, inMyCards: Bool) {
+    public init(
+        termId: Int64?,
+        termKo: String,
+        plainKo: String,
+        matchedText: String,
+        startIndex: Int,
+        endIndex: Int,
+        inMyCards: Bool,
+        confidence: Double = 1
+    ) {
         self.termId = termId
         self.termKo = termKo
         self.plainKo = plainKo
@@ -42,6 +54,12 @@ public struct DetectedTerm: Sendable, Equatable, Hashable {
         self.startIndex = startIndex
         self.endIndex = endIndex
         self.inMyCards = inMyCards
+        self.confidence = confidence
+    }
+
+    /// 사전에도 없고 뜻도 아직 없는 말(문맥 모델이 찾음). 형광펜은 칠하되 "확률"을 같이 보여 준다.
+    public var isContextGuess: Bool {
+        termId == nil && plainKo.isEmpty
     }
 }
 
