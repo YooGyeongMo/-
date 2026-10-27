@@ -36,13 +36,13 @@ def main() -> None:
     import uvicorn
     from sqlalchemy.ext.asyncio import create_async_engine
 
-    from app.all_models import metadata
+    from app.all_models import active_metadata
     from app.decode.infra.seed import seed
 
     async def prepare() -> int:
         engine = create_async_engine(os.environ["MWONMAL_DATABASE_URL"])
         async with engine.begin() as conn:
-            await conn.run_sync(metadata.create_all)
+            await conn.run_sync(active_metadata().create_all)
             added: int = await conn.run_sync(seed)
         await engine.dispose()
         return added

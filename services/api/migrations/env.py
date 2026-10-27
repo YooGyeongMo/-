@@ -8,6 +8,7 @@ from sqlalchemy.engine import Connection
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from app.all_models import metadata
+from app.core.schema import ACTIVE_TABLES
 from app.core.settings import settings
 
 config = context.config
@@ -18,8 +19,21 @@ if config.config_file_name is not None:
 URL = config.attributes.get("database_url") or settings.database_url
 
 
+def include_object(
+    obj: object, name: str | None, type_: str, reflected: bool, compare_to: object
+) -> bool:
+    """모델은 17테이블, DB 는 열린 테이블만(ADR-0021). 비교·생성은 열린 것과 그 사이 외래 키만."""
+    if type_ == "table":
+        return name in ACTIVE_TABLES
+    if type_ == "foreign_key_constraint":
+        return getattr(getattr(obj, "referred_table", None), "name", None) in ACTIVE_TABLES
+    return True
+
+
 def run_migrations_offline() -> None:
-    context.configure(url=URL, target_metadata=metadata, literal_binds=True)
+    context.configure(
+        url=URL, target_metadata=metadata, literal_binds=True, include_object=include_object
+    )
     with context.begin_transaction():
         context.run_migrations()
 
@@ -31,6 +45,7 @@ def _run(connection: Connection) -> None:
         compare_type=True,
         compare_server_default=True,
         render_as_batch=connection.dialect.name == "sqlite",
+        include_object=include_object,
     )
     with context.begin_transaction():
         context.run_migrations()

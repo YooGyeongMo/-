@@ -3,6 +3,7 @@
 개수는 다른 컨텍스트 테이블을 이름으로만 세어 온다(컨텍스트 독립).
 """
 
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
@@ -10,6 +11,7 @@ import sqlalchemy as sa
 from fastapi import APIRouter
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import schema
 from app.core.auth import CurrentPrincipal
 from app.core.db import DbSession
 from app.core.errors import DomainError, ErrorCode
@@ -33,54 +35,71 @@ _cards = sa.table(
 )
 
 
-async def _body(s: AsyncSession, p: Project) -> dict[str, Any]:
-    meetings = (
-        await s.execute(sa.select(sa.func.count()).where(Meeting.project_id == p.id))
-    ).scalar_one()
-    translations = (
-        await s.execute(sa.select(sa.func.count()).where(_translations.c.project_id == p.id))
-    ).scalar_one()
-    open_actions = (
-        await s.execute(
-            sa.select(sa.func.count())
-            .select_from(_actions)
-            .join(_translations, _translations.c.id == _actions.c.translation_id)
-            .where(_translations.c.project_id == p.id, _actions.c.is_checked.is_(False))
-        )
-    ).scalar_one()
-    unknown = (
-        await s.execute(
-            sa.select(sa.func.count())
+@dataclass
+class _Stats:
+    translations: int = 0
+    open_actions: int = 0
+    unknown_terms: int = 0
+    meetings: int = 0
+    last: datetime | None = None
+
+
+async def _stats(s: AsyncSession, ids: list[int]) -> dict[int, _Stats]:
+    """페이지의 프로젝트 전부를 한꺼번에 센다 — 프로젝트마다 6문(N+1) → 표마다 1문(GROUP BY).
+
+    회의·카드 표는 열린 뒤에만 센다(ADR-0021). 없으면 0 이 계약상 맞는 값이다(회의·카드가 없다).
+    """
+    out = {pid: _Stats() for pid in ids}
+    if not ids:
+        return out
+    tr = _translations.c
+    for pid, n, last in await s.execute(
+        sa.select(tr.project_id, sa.func.count(), sa.func.max(tr.created_at))
+        .where(tr.project_id.in_(ids))
+        .group_by(tr.project_id)
+    ):
+        out[pid].translations, out[pid].last = int(n), last
+    for pid, n in await s.execute(
+        sa.select(tr.project_id, sa.func.count())
+        .select_from(_actions)
+        .join(_translations, tr.id == _actions.c.translation_id)
+        .where(tr.project_id.in_(ids), _actions.c.is_checked.is_(False))
+        .group_by(tr.project_id)
+    ):
+        out[pid].open_actions = int(n)
+    if schema.has("cards"):
+        for pid, n in await s.execute(
+            sa.select(tr.project_id, sa.func.count())
             .select_from(_cards)
-            .join(_translations, _translations.c.id == _cards.c.source_translation_id)
-            .where(_translations.c.project_id == p.id, _cards.c.status != "MASTERED")
-        )
-    ).scalar_one()
-    last: datetime | None = (
-        await s.execute(
-            sa.select(sa.func.max(_translations.c.created_at)).where(
-                _translations.c.project_id == p.id
-            )
-        )
-    ).scalar()
-    last_meeting: datetime | None = (
-        await s.execute(
-            sa.select(sa.func.max(Meeting.created_at)).where(Meeting.project_id == p.id)
-        )
-    ).scalar()
-    candidates = [d for d in (last, last_meeting) if d is not None]
-    last_activity = max(candidates) if candidates else (p.updated_at or p.created_at)
+            .join(_translations, tr.id == _cards.c.source_translation_id)
+            .where(tr.project_id.in_(ids), _cards.c.status != "MASTERED")
+            .group_by(tr.project_id)
+        ):
+            out[pid].unknown_terms = int(n)
+    if schema.has("meetings"):
+        for pid, n, last in await s.execute(
+            sa.select(Meeting.project_id, sa.func.count(), sa.func.max(Meeting.created_at))
+            .where(Meeting.project_id.in_(ids))
+            .group_by(Meeting.project_id)
+        ):
+            st = out[pid]
+            st.meetings = int(n)
+            st.last = last if st.last is None or (last is not None and last > st.last) else st.last
+    return out
+
+
+def _body(p: Project, st: _Stats) -> dict[str, Any]:
     return {
         "projectId": p.id,
         "name": p.name,
         "description": p.description or "",
-        "meetingCount": int(meetings),
+        "meetingCount": st.meetings,
         "color": p.color,
-        "translationCount": int(translations),
-        "openActionCount": int(open_actions),
-        "unknownTermCount": int(unknown),
+        "translationCount": st.translations,
+        "openActionCount": st.open_actions,
+        "unknownTermCount": st.unknown_terms,
         "isDefault": bool(p.is_default),
-        "lastActivityAt": to_api(last_activity),
+        "lastActivityAt": to_api(st.last or p.updated_at or p.created_at),
         "createdAt": to_api(p.created_at),
     }
 
@@ -90,24 +109,28 @@ async def get_projects(
     principal: CurrentPrincipal, db: DbSession, page: PageQuery = 1, size: SizeQuery = 10
 ) -> dict[str, object]:
     where = Project.user_id == principal.user_id
-    total = int(
-        (
-            await db.execute(sa.select(sa.func.count()).select_from(Project).where(where))
-        ).scalar_one()
-    )
+
+    async def total() -> int:
+        q = sa.select(sa.func.count()).select_from(Project).where(where)
+        return int((await db.execute(q)).scalar_one())
+
     off = offset_of(page, size)
     if off is None:
-        return paged([], page, size, total)
+        return paged([], page, size, await total())
     rows = (
         await db.execute(
-            sa.select(Project)
+            sa.select(Project, sa.func.count().over())
             .where(where)
             .order_by(Project.is_default.desc(), Project.created_at, Project.id)
             .offset(off)
             .limit(size)
         )
-    ).scalars()
-    return paged([await _body(db, p) for p in rows], page, size, total)
+    ).all()
+    if not rows:
+        return paged([], page, size, 0 if off == 0 else await total())
+    projects = [p for p, _ in rows]
+    stats = await _stats(db, [p.id for p in projects])
+    return paged([_body(p, stats[p.id]) for p in projects], page, size, int(rows[0][1]))
 
 
 @router.get("/projects/{projectId}")
@@ -122,4 +145,4 @@ async def get_project(
         raise DomainError(ErrorCode.PROJECT_NOT_FOUND, "프로젝트를 찾을 수 없어요.")
     if p.user_id != principal.user_id:
         raise DomainError(ErrorCode.NOT_OWNER, "내 프로젝트가 아니에요.")
-    return await _body(db, p)
+    return _body(p, (await _stats(db, [p.id]))[p.id])

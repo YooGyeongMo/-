@@ -1,4 +1,9 @@
-"""dbml v1.0 17 tables — contracts/db.dbml 그대로 (14번 §6).
+"""v1.0 핵심 8테이블 — contracts/db.dbml 그대로의 정의 중 v1.0 기능이 쓰는 것만 (14번 §6, ADR-0021).
+
+나머지 9테이블(학습 5·회의 2·알림 2)은 `migrations/staged/`에 정의를 그대로 두고, 그 기능이 열릴 때
+새 리비전으로 옮겨 붙인다(추가만 하므로 기존 테이블·데이터에 영향 없음). translations.meeting_id
+는 열만 두고
+meetings 테이블이 생길 때 외래 키를 붙인다.
 
 users.current_project_id FK 만 손으로 옮겼다(순환 참조).
 
@@ -77,34 +82,6 @@ def upgrade() -> None:
     op.create_index("ux_users_nickname", "users", ["nickname"], unique=True)
     op.create_index("ux_users_provider", "users", ["provider", "provider_id"], unique=True)
     op.create_table(
-        "notifications",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column(
-            "type",
-            sa.Enum(
-                "REVIEW_REMINDER", "ACTION_DUE", "DECODE_DONE", "LEVEL_UP", name="notification_type"
-            ),
-            nullable=False,
-        ),
-        sa.Column("title", sa.String(length=100), nullable=False),
-        sa.Column("body", sa.String(length=300), nullable=False),
-        sa.Column("target_id", sa.BigInteger(), nullable=True),
-        sa.Column("scheduled_at", sa.DateTime(), nullable=False),
-        sa.Column("sent_at", sa.DateTime(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_notifications_user_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_notifications")),
-    )
-    op.create_index("ix_noti_user_time", "notifications", ["user_id", "scheduled_at"], unique=False)
-    op.create_table(
         "projects",
         sa.Column(
             "id",
@@ -130,52 +107,6 @@ def upgrade() -> None:
             op.f("fk_users_current_project_id"), "projects", ["current_project_id"], ["id"]
         )
     op.create_index("ux_projects_user_name", "projects", ["user_id", "name"], unique=True)
-    op.create_table(
-        "quiz_sessions",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("question_count", sa.Integer(), server_default=sa.text("5"), nullable=False),
-        sa.Column("correct_count", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("score", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("level_code", sa.String(length=20), nullable=True),
-        sa.Column(
-            "started_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.Column("finished_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(
-            ["level_code"], ["levels.code"], name=op.f("fk_quiz_sessions_level_code")
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_quiz_sessions_user_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_quiz_sessions")),
-    )
-    op.create_index("ix_quiz_user_time", "quiz_sessions", ["user_id", "started_at"], unique=False)
-    op.create_table(
-        "review_sessions",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("target_count", sa.Integer(), nullable=False),
-        sa.Column("completed_count", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("good_count", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column(
-            "started_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.Column("finished_at", sa.DateTime(), nullable=True),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_review_sessions_user_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_review_sessions")),
-    )
-    op.create_index(
-        "ix_review_sessions_user_time", "review_sessions", ["user_id", "started_at"], unique=False
-    )
     op.create_table(
         "terms",
         sa.Column(
@@ -219,86 +150,6 @@ def upgrade() -> None:
     op.create_index("ix_terms_created_by", "terms", ["created_by"], unique=False)
     op.create_index("ix_terms_status_category", "terms", ["status", "category"], unique=False)
     op.create_index("ix_terms_term_ko", "terms", ["term_ko"], unique=False)
-    op.create_table(
-        "user_devices",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("platform", sa.Enum("IOS", "WEB", name="device_platform"), nullable=False),
-        sa.Column("push_token", sa.String(length=255), nullable=True),
-        sa.Column(
-            "last_seen_at",
-            sa.DateTime(),
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-            nullable=False,
-        ),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_user_devices_user_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_user_devices")),
-    )
-    op.create_index(
-        "ix_devices_user_platform", "user_devices", ["user_id", "platform"], unique=False
-    )
-    op.create_index("ux_devices_token", "user_devices", ["push_token"], unique=True)
-    op.create_table(
-        "meetings",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("project_id", sa.BigInteger(), nullable=False),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("title", sa.String(length=100), nullable=False),
-        sa.Column("held_at", sa.DateTime(), nullable=False),
-        sa.Column("attendee_count", sa.Integer(), server_default=sa.text("1"), nullable=False),
-        sa.Column("agenda", sa.String(length=200), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.ForeignKeyConstraint(
-            ["project_id"], ["projects.id"], name=op.f("fk_meetings_project_id")
-        ),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_meetings_user_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_meetings")),
-    )
-    op.create_index("ix_meetings_project_time", "meetings", ["project_id", "held_at"], unique=False)
-    op.create_index("ix_meetings_user", "meetings", ["user_id"], unique=False)
-    op.create_table(
-        "quiz_questions",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("quiz_session_id", sa.BigInteger(), nullable=False),
-        sa.Column("term_id", sa.BigInteger(), nullable=False),
-        sa.Column("question_text", sa.String(length=300), nullable=False),
-        sa.Column("choices", sa.JSON(), nullable=False),
-        sa.Column("answer_index", sa.Integer(), nullable=False),
-        sa.Column("selected_index", sa.Integer(), nullable=True),
-        sa.Column("is_correct", sa.Boolean(), server_default=sa.text("0"), nullable=False),
-        sa.Column("sort_order", sa.Integer(), nullable=False),
-        sa.ForeignKeyConstraint(
-            ["quiz_session_id"],
-            ["quiz_sessions.id"],
-            name=op.f("fk_quiz_questions_quiz_session_id"),
-        ),
-        sa.ForeignKeyConstraint(["term_id"], ["terms.id"], name=op.f("fk_quiz_questions_term_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_quiz_questions")),
-    )
-    op.create_index("ix_quiz_q_term", "quiz_questions", ["term_id"], unique=False)
-    op.create_index(
-        "ux_quiz_q_order", "quiz_questions", ["quiz_session_id", "sort_order"], unique=True
-    )
     op.create_table(
         "term_examples",
         sa.Column(
@@ -369,9 +220,6 @@ def upgrade() -> None:
             "created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
         ),
         sa.ForeignKeyConstraint(
-            ["meeting_id"], ["meetings.id"], name=op.f("fk_translations_meeting_id")
-        ),
-        sa.ForeignKeyConstraint(
             ["project_id"], ["projects.id"], name=op.f("fk_translations_project_id")
         ),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_translations_user_id")),
@@ -386,98 +234,6 @@ def upgrade() -> None:
     )
     op.create_index(
         "ix_translations_user_time", "translations", ["user_id", "created_at"], unique=False
-    )
-    op.create_table(
-        "cards",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("term_id", sa.BigInteger(), nullable=False),
-        sa.Column("source_translation_id", sa.BigInteger(), nullable=True),
-        sa.Column(
-            "status",
-            sa.Enum("LEARNING", "MASTERED", "PAUSED", name="card_status"),
-            server_default="LEARNING",
-            nullable=False,
-        ),
-        sa.Column("memo", sa.String(length=300), nullable=True),
-        sa.Column("interval_days", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column(
-            "ease_factor",
-            sa.Numeric(precision=4, scale=2),
-            server_default=sa.text("2.50"),
-            nullable=False,
-        ),
-        sa.Column("repetition_count", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("lapse_count", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("due_date", sa.Date(), nullable=False),
-        sa.Column("last_reviewed_at", sa.DateTime(), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.ForeignKeyConstraint(
-            ["source_translation_id"],
-            ["translations.id"],
-            name=op.f("fk_cards_source_translation_id"),
-        ),
-        sa.ForeignKeyConstraint(["term_id"], ["terms.id"], name=op.f("fk_cards_term_id")),
-        sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_cards_user_id")),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_cards")),
-    )
-    op.create_index("ix_cards_due", "cards", ["user_id", "due_date"], unique=False)
-    op.create_index("ix_cards_source_translation", "cards", ["source_translation_id"], unique=False)
-    op.create_index("ix_cards_status", "cards", ["user_id", "status"], unique=False)
-    op.create_index("ux_cards_user_term", "cards", ["user_id", "term_id"], unique=True)
-    op.create_table(
-        "meeting_recordings",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("user_id", sa.BigInteger(), nullable=False),
-        sa.Column("meeting_id", sa.BigInteger(), nullable=False),
-        sa.Column("translation_id", sa.BigInteger(), nullable=True),
-        sa.Column("audio_url", sa.String(length=500), nullable=True),
-        sa.Column("duration_sec", sa.Integer(), nullable=False),
-        sa.Column("consent_confirmed", sa.Boolean(), nullable=False),
-        sa.Column(
-            "status",
-            sa.Enum(
-                "RECORDING", "UPLOADED", "TRANSCRIBING", "DONE", "FAILED", name="recording_status"
-            ),
-            server_default="RECORDING",
-            nullable=False,
-        ),
-        sa.Column("progress", sa.Integer(), server_default=sa.text("0"), nullable=False),
-        sa.Column("transcript", sa.Text(), nullable=True),
-        sa.Column("failure_reason", sa.String(length=200), nullable=True),
-        sa.Column("expires_at", sa.DateTime(), nullable=False),
-        sa.Column(
-            "created_at", sa.DateTime(), server_default=sa.text("CURRENT_TIMESTAMP"), nullable=False
-        ),
-        sa.ForeignKeyConstraint(
-            ["meeting_id"], ["meetings.id"], name=op.f("fk_meeting_recordings_meeting_id")
-        ),
-        sa.ForeignKeyConstraint(
-            ["translation_id"],
-            ["translations.id"],
-            name=op.f("fk_meeting_recordings_translation_id"),
-        ),
-        sa.ForeignKeyConstraint(
-            ["user_id"], ["users.id"], name=op.f("fk_meeting_recordings_user_id")
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_meeting_recordings")),
-        sa.UniqueConstraint("translation_id", name=op.f("uq_meeting_recordings_translation_id")),
-    )
-    op.create_index("ix_recordings_meeting", "meeting_recordings", ["meeting_id"], unique=False)
-    op.create_index(
-        "ix_recordings_user_time", "meeting_recordings", ["user_id", "created_at"], unique=False
     )
     op.create_table(
         "translation_actions",
@@ -545,38 +301,6 @@ def upgrade() -> None:
     )
     op.create_index("ix_tt_term", "translation_terms", ["term_id"], unique=False)
     op.create_index("ix_tt_translation", "translation_terms", ["translation_id"], unique=False)
-    op.create_table(
-        "review_logs",
-        sa.Column(
-            "id",
-            sa.BigInteger().with_variant(sa.Integer(), "sqlite"),
-            autoincrement=True,
-            nullable=False,
-        ),
-        sa.Column("review_session_id", sa.BigInteger(), nullable=False),
-        sa.Column("card_id", sa.BigInteger(), nullable=False),
-        sa.Column(
-            "rating", sa.Enum("AGAIN", "HARD", "GOOD", "EASY", name="review_rating"), nullable=False
-        ),
-        sa.Column("prev_interval", sa.Integer(), nullable=False),
-        sa.Column("next_interval", sa.Integer(), nullable=False),
-        sa.Column("elapsed_ms", sa.Integer(), nullable=True),
-        sa.Column(
-            "reviewed_at",
-            sa.DateTime(),
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-            nullable=False,
-        ),
-        sa.ForeignKeyConstraint(["card_id"], ["cards.id"], name=op.f("fk_review_logs_card_id")),
-        sa.ForeignKeyConstraint(
-            ["review_session_id"],
-            ["review_sessions.id"],
-            name=op.f("fk_review_logs_review_session_id"),
-        ),
-        sa.PrimaryKeyConstraint("id", name=op.f("pk_review_logs")),
-    )
-    op.create_index("ix_review_logs_card", "review_logs", ["card_id"], unique=False)
-    op.create_index("ix_review_logs_session", "review_logs", ["review_session_id"], unique=False)
     # ### end Alembic commands ###
 
 
@@ -585,21 +309,12 @@ def downgrade() -> None:
     # ### commands auto generated by Alembic - please adjust! ###
     with op.batch_alter_table("users") as batch:
         batch.drop_constraint(op.f("fk_users_current_project_id"), type_="foreignkey")
-    op.drop_table("review_logs")
     op.drop_table("translation_terms")
     op.drop_table("translation_actions")
-    op.drop_table("meeting_recordings")
-    op.drop_table("cards")
     op.drop_table("translations")
     op.drop_table("term_examples")
-    op.drop_table("quiz_questions")
-    op.drop_table("meetings")
-    op.drop_table("user_devices")
     op.drop_table("terms")
-    op.drop_table("review_sessions")
-    op.drop_table("quiz_sessions")
     op.drop_table("projects")
-    op.drop_table("notifications")
     op.drop_table("users")
     op.drop_table("levels")
     # ### end Alembic commands ###

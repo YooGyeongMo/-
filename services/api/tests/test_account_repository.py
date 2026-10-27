@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.all_models import metadata
+from app.all_models import active_metadata
 from app.identity.domain.model import OAuthIdentity
 from app.identity.infra.repository import SqlAccountRepository
 
@@ -21,8 +21,8 @@ async def test_create_twice_returns_existing(tmp_path: Path, backend: str) -> No
             pytest.skip("MWONMAL_TEST_MYSQL_URL 없음")
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
-        await conn.run_sync(metadata.create_all)
+        await conn.run_sync(active_metadata().drop_all)
+        await conn.run_sync(active_metadata().create_all)
     maker = async_sessionmaker(engine, expire_on_commit=False)
     who = OAuthIdentity(provider="APPLE", provider_id="same", email="s@x.com")
     async with maker() as s, s.begin():
@@ -32,7 +32,7 @@ async def test_create_twice_returns_existing(tmp_path: Path, backend: str) -> No
     assert (created1, created2) == (True, False)
     assert second.id == first.id and second.nickname == "닉1"
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
+        await conn.run_sync(active_metadata().drop_all)
     await engine.dispose()
 
 
@@ -44,8 +44,8 @@ def anyio_backend() -> str:
 async def _fresh(url: str):  # type: ignore[no-untyped-def]
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
-        await conn.run_sync(metadata.create_all)
+        await conn.run_sync(active_metadata().drop_all)
+        await conn.run_sync(active_metadata().create_all)
     return engine
 
 
@@ -86,5 +86,5 @@ async def test_real_race_on_mysql(other: OAuthIdentity, expect: str) -> None:
                 assert e.value.code.value == "EMAIL_ALREADY_REGISTERED"
     finally:
         async with engine.begin() as conn:
-            await conn.run_sync(metadata.drop_all)
+            await conn.run_sync(active_metadata().drop_all)
         await engine.dispose()

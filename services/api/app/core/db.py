@@ -43,7 +43,19 @@ def now() -> sa.TextClause:
 def get_engine() -> AsyncEngine:
     # hide_parameters: DB 오류 메시지·로그에 바인드 값(이메일, 사용자 원문 등)을 싣지 않는다
     # (ADR-0008 / REQ-14: 원문·개인정보는 로그에 남기지 않는다).
-    return create_async_engine(settings.database_url, pool_pre_ping=True, hide_parameters=True)
+    # pool_pre_ping 은 빌릴 때마다 COM_PING 1왕복(~0.3ms)이 든다. 그래도 켠다 — DB 재시작·
+    # 장애 조치 뒤 죽은 연결로 첫 요청이 500 나는 것보다 싸다(ADR-0021 §성능).
+    pool: dict[str, object] = {}
+    if not settings.database_url.startswith("sqlite"):
+        pool = {
+            "pool_size": settings.db_pool_size,
+            "max_overflow": settings.db_max_overflow,
+            "pool_timeout": settings.db_pool_timeout_sec,
+            "pool_recycle": settings.db_pool_recycle_sec,
+        }
+    return create_async_engine(
+        settings.database_url, pool_pre_ping=True, hide_parameters=True, **pool
+    )
 
 
 async def ping(engine: AsyncEngine) -> bool:

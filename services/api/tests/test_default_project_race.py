@@ -11,7 +11,7 @@ import pytest
 import sqlalchemy as sa
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
-from app.all_models import metadata
+from app.all_models import active_metadata
 from app.decode.infra.repository import ensure_default_project
 
 
@@ -30,8 +30,8 @@ async def test_concurrent_default_project(tmp_path: Path, backend: str) -> None:
             pytest.skip("MWONMAL_TEST_MYSQL_URL 없음")
     engine = create_async_engine(url)
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
-        await conn.run_sync(metadata.create_all)
+        await conn.run_sync(active_metadata().drop_all)
+        await conn.run_sync(active_metadata().create_all)
         await conn.execute(
             sa.text(
                 "INSERT INTO users (email, provider, provider_id, nickname) "
@@ -52,5 +52,5 @@ async def test_concurrent_default_project(tmp_path: Path, backend: str) -> None:
         count: int = (await conn.execute(sa.text("SELECT COUNT(*) FROM projects"))).scalar_one()
     assert count == 1
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.drop_all)
+        await conn.run_sync(active_metadata().drop_all)
     await engine.dispose()
