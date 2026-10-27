@@ -4,13 +4,13 @@
 > 대화 기록은 길어지면 자동 요약되어 세부가 날아간다. 그래서 중요한 것은 전부 여기와 `docs/` 아래, 그리고 GitHub 이슈에 있다.
 > 세션이 끝날 때마다 이 파일을 갱신한다(`/mw-save`). 새 세션은 `/mw` 로 이 파일부터 읽는다.
 
-**마지막 갱신**: 2026-10-26 · **main**: `47f4bdb` · **CI**: app·server·secrets 초록(main)
+**마지막 갱신**: 2026-10-27 · **main**: PR #114(서버 해석)·#116(앱 해석) 머지 대상 · **CI**: 확인 후 머지
 
 ---
 
 ## 1. 지금 단계 — 한 문장
 
-**v1.0 해석(11/20) Day 1~5 완료, 계획보다 약 4일 앞섬.** 앱 구조는 MVVM-R + 기능 모듈(ADR-0016), 온디바이스 AI는 v1.0에 넣지 않음(ADR-0015). 다음은 **Day 6 서버 사전 시드·trie(#12)**. 일정의 단일 원본 = `docs/16_실행계획.md` §0.
+**v1.0 해석(11/20) Day 1~15 분량 완료(로컬 E2E 통과), 계획보다 약 2주 앞섬.** 남은 v1.0: 실서버(OCI) 배포 Day 16~17, TestFlight Day 18, 실기기 QA Day 19. Apple 키(.p8)가 있어야 실로그인.
 
 | 릴리스 | 마감 | 마일스톤 |
 |---|---|---|
@@ -72,12 +72,17 @@ claude --resume 3709399e-b05f-475b-94d3-f593771c009a   # 이 대화 이어가기
 # 또는 새 대화에서:  /mw
 ```
 
+## 6-1. 2026-10-27 한 것
+- 서버 해석 API(PR #114), 앱 해석 화면 + E2E(PR #116). 레드팀 3라운드 기록 `docs/lessons/2026-10-27-decode-redteam.md`.
+- 로컬 실행: `cd services/api && uv run python scripts/dev_server.py --fresh` → 앱 Debug 실행 인자 `-MWDevLogin <이름>`(+ `-MWResetSession`).
+- E2E: `xcodebuild test -scheme MwonmalE2E`(서버 켜 둔 상태).
+
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)
 
-1. **Day 6 (server, #12)**: 사전 시드·trie·인덱스(유니코드 스칼라 기준, REQ-14)
-2. Day 7 (#36) EngineRouter 최소 → Day 8 (#11) `POST/GET translations` + 원문 무유출 카나리
-3. #110: 계약 검사가 200 경로도 보게(CI 테스트 토큰 + 가짜 Apple)
-4. #99 잔여: 화면이 늘 때마다 ko·en 문구, en 스냅샷
-5. #9 잔여: Apple 키 등록 후 로컬 서버 실로그인
+1. **사용자 작업 D**: Apple 키(.p8) → `services/api/.env` → 실로그인(#9 닫기)
+2. **Day 16~17 (infra, #26 #30)**: OCI VM + Compose prod(caddy·mysql·redis) + 배포 스크립트, 앱 `.live` 연결
+3. **Gemini 키 결정**: 운영에서 `MWONMAL_AI_EXTERNAL_TEXT=1` + 키(sops)를 켤지(켜지 않으면 모두 사전 간이 해석)
+4. 레드팀 Low 잔여 #115, #4 잔여(`/levels`), #99 en 스냅숏
+5. Day 18~19: TestFlight·실기기 QA(SE iOS 17 + 최신 iPhone)
 
-열린 v1.0 후속: #4 잔여(`/levels`), #110. 금요일 15분 회고 → `docs/log/`.
+열린 v1.0 후속: #4 잔여, #115 레드팀 잔여. 금요일 15분 회고 → `docs/log/`.
