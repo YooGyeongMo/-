@@ -85,15 +85,15 @@ public struct DictionaryTrie: Sendable {
     ].sorted { $0.unicodeScalars.count > $1.unicodeScalars.count }
 
     private static func starts(_ raw: ArraySlice<Unicode.Scalar>, with word: String) -> Bool {
-        let w = Array(word.unicodeScalars)
-        return raw.count >= w.count && Array(raw.prefix(w.count)) == w
+        let scalars = Array(word.unicodeScalars)
+        return raw.count >= scalars.count && Array(raw.prefix(scalars.count)) == scalars
     }
 
     private static func particlesOK(_ rest: ArraySlice<Unicode.Scalar>, depth: Int) -> Bool {
         guard let first = rest.first, ScalarClass(first) == .hangul else { return true }
         guard depth > 0 else { return false }
-        return particles.contains { p in
-            starts(rest, with: p) && particlesOK(rest.dropFirst(p.unicodeScalars.count), depth: depth - 1)
+        return particles.contains { particle in
+            starts(rest, with: particle) && particlesOK(rest.dropFirst(particle.unicodeScalars.count), depth: depth - 1)
         }
     }
 
