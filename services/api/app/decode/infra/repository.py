@@ -209,6 +209,11 @@ async def ensure_default_project(s: AsyncSession, user_id: int) -> ProjectRef:
     받고
     먼저 만들어진 행을 다시 읽는다(레드팀 H-3).
     """
+    # 사용자 행을 먼저 배타 잠금: 같은 사람의 첫 해석들이 여기서 한 줄로 선다. 안 그러면 각자
+    # projects INSERT 의
+    # 외래 키 확인으로 users 행에 공유 잠금을 쥔 채 UPDATE(배타)로 올리려다 서로 교착한다(MySQL
+    # 1213, CI 경합 테스트).
+    await s.execute(sa.select(_users.c.id).where(_users.c.id == user_id).with_for_update())
     ref = await _default_project(s, user_id)
     if ref is None:
         try:
