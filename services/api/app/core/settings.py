@@ -1,3 +1,4 @@
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,6 +45,11 @@ class Settings(BaseSettings):
     gemini_rpm: int = 10
     gemini_rpd: int = 250
     gemini_timeout_sec: float = 12.0
+
+    # 문맥 판교어 탐지기(글자 CRF, ADR-0023). 사전에 없는 표기·새 말을 앞뒤 글자 문맥으로 찾는다.
+    # 서버 안에서만 돈다(원문 외부 전송 없음). 끄거나 모델 파일이 없으면 사전만(이전과 같은 결과).
+    jargon_model: bool = True
+    jargon_model_threshold: float = Field(default=0.9, ge=0.0, le=1.0)
 
 
 settings = Settings()

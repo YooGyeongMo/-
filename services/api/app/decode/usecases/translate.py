@@ -3,15 +3,21 @@
 원문은 이 함수 밖 로그·예외 어디에도 싣지 않는다(카나리 테스트, REQ-14).
 """
 
+import logging
 import unicodedata
 from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import DomainError, ErrorCode
+from app.core.settings import settings
 from app.core.time import utcnow
+from app.decode.domain.jargon_features import add_model_spans
 from app.decode.domain.model import EngineRequest, EngineResult, NewTerm, Span
+from app.decode.infra import jargon_model
 from app.decode.infra import repository as repo
+
+log = logging.getLogger(__name__)
 
 NEW_TERM_CONFIDENCE = 0.7
 
@@ -60,6 +66,25 @@ def place_new_terms(text: str, spans: list[Span], new_terms: tuple[NewTerm, ...]
     return out
 
 
+def add_context_spans(text: str, spans: list[Span]) -> list[Span]:
+    """사전·AI 가 잡지 못한 자리에 문맥 탐지기(ADR-0023) 스팬을 더한다.
+
+    이미 잡힌 스팬은 바꾸지 않는다(사전 우선, AI 새 말은 뜻이 있어 모델보다 우선). 꺼져 있거나
+    모델이 없거나 추론이 실패하면 받은 그대로 돌려준다. 실패 로그에도 원문은 싣지 않는다.
+    """
+    if not settings.jargon_model:
+        return spans
+    tagger = jargon_model.shared()
+    if tagger is None:
+        return spans
+    try:
+        candidates = tagger.candidates(text)
+    except Exception:  # 모델 실패가 해석 전체를 막지 않게(사전 결과는 그대로)
+        log.warning("jargon_model_failed")
+        return spans
+    return add_model_spans(text, spans, candidates, settings.jargon_model_threshold)
+
+
 async def translate(
     s: AsyncSession,
     router: Router,
@@ -103,6 +128,8 @@ async def translate(
     request = EngineRequest(source_text, direction, tuple(spans), utcnow())
     result, latency = await router.decode(request, consent=consent)
     spans = place_new_terms(source_text, spans, result.new_terms)
+    if direction == "JARGON_TO_PLAIN":
+        spans = add_context_spans(source_text, spans)
 
     return await repo.insert_translation(
         s,
