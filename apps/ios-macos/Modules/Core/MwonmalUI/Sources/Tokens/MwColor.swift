@@ -33,6 +33,21 @@ public enum MwColor {
     public static let doneFill = token("status.doneFill")
     public static let doneText = token("status.doneText")
 
+    /// Figma v5.2 화면(A-01·A-06·A-09·A-11)에서 더 쓰는 값.
+    public static let textStrong = token("text.strong") // #3A3150 칩 글자·날짜
+    public static let textDisabled = token("text.disabled") // #A6A0AE 잠긴 등급·끝난 할 일·꺼진 탭
+    public static let chipFill = token("chip.fill") // #EAE6F0
+    public static let checkboxBorder = token("control.checkbox") // #D8D2C8
+    public static let badgeFill = token("badge.fill") // #EE7A3B 탭 숫자 배지
+    public static let accentShadow = token("accent.shadow") // #2459B4 파란 버튼 아래 2pt
+    public static let accentSoftFill = token("accent.softFill") // #E4F2FA "지금" 배지
+    public static let glassFill = token("glass.fill") // 흰 74%
+    public static let glassFillThin = token("glass.fillThin") // 흰 60%
+    public static let glassBorder = token("glass.border") // 흰 75%
+    public static let tabSelected = token("tab.selected") // 흰 85%
+    public static let jargonHighlight = token("jargon.highlight") // #F7C948 50% 형광펜
+    public static let sheetGrabber = token("sheet.grabber")
+
     /// 테스트·카탈로그가 전부를 훑을 수 있게.
     public static let allNames: [String] = [
         "bg.canvas", "bg.surface", "bg.surfaceMuted", "bg.brandPanel",
@@ -41,6 +56,9 @@ public enum MwColor {
         "jargon.fill", "jargon.underline", "jargon.chipFill", "jargon.chipText",
         "status.urgentFill", "status.urgentText", "status.soonFill", "status.soonText",
         "status.doneFill", "status.doneText",
+        "text.strong", "text.disabled", "chip.fill", "control.checkbox", "badge.fill", "accent.shadow",
+        "accent.softFill", "glass.fill", "glass.fillThin", "glass.border", "tab.selected", "jargon.highlight",
+        "sheet.grabber",
     ]
 
     static func token(_ name: String) -> Color {

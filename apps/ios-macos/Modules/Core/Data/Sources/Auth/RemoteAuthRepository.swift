@@ -47,6 +47,15 @@ public struct RemoteAuthRepository: AuthRepository {
 
     static func profile(_ dto: Components.Schemas.UserResponse) throws -> UserProfile {
         guard let id = dto.userId else { throw DomainError.server(code: "INVALID_RESPONSE", message: nil) }
-        return UserProfile(id: id, nickname: dto.nickname ?? "", email: dto.email, jobGroup: dto.jobGroup?.value1.rawValue)
+        return UserProfile(
+            id: id,
+            nickname: dto.nickname ?? "",
+            email: dto.email,
+            jobGroup: dto.jobGroup?.value1.rawValue,
+            levelCode: dto.level?.value1.code?.rawValue,
+            bestScore: dto.bestScore ?? 0,
+            currentStreak: dto.currentStreak ?? 0,
+            currentProjectId: dto.currentProjectId
+        )
     }
 }

@@ -28,7 +28,14 @@ enum DomainErrorMapping {
             case "OAUTH_CODE_INVALID": return .signInFailed(message: server.message)
             case "EMAIL_ALREADY_REGISTERED": return .emailAlreadyRegistered(message: server.message)
             case "UNAUTHORIZED": return .unauthorized
-            default: return .server(code: server.code, message: server.message)
+            case "AI_UNAVAILABLE": return .aiUnavailable(retryAfter: server.retryAfterSeconds, message: server.message)
+            case "INVALID_INPUT": return .invalidInput(message: server.message)
+            case "NOT_OWNER", "FORBIDDEN": return .notFound
+            default:
+                if server.code.hasSuffix("_NOT_FOUND") || server.code == "NOT_FOUND" {
+                    return .notFound
+                }
+                return .server(code: server.code, message: server.message)
             }
         }
         return .unknown

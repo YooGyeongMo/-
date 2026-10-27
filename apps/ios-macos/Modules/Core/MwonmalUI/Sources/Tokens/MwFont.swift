@@ -8,7 +8,9 @@ import SwiftUI
 public enum MwFont {
     public enum Weight: String, CaseIterable, Sendable {
         case regular = "Pretendard-Regular"
+        case medium = "Pretendard-Medium"
         case semiBold = "Pretendard-SemiBold"
+        case bold = "Pretendard-Bold"
         case extraBold = "Pretendard-ExtraBold"
     }
 

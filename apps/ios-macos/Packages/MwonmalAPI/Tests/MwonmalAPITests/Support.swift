@@ -53,6 +53,7 @@ func makeClient(
             ErrorMiddleware(),
             RetryMiddleware(sleep: { await sleeps.record($0) }),
             AuthMiddleware(accessToken: { token }, unauthorized: signal),
+            AIConsentMiddleware(),
         ]
     )
 }
