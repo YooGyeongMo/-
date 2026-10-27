@@ -7,7 +7,7 @@
 - 인덱스 = 유니코드 스칼라 위치(파이썬 str 인덱스와 같다). 계약 DetectedTerm.startIndex/endIndex.
 - 최장 일치. 시작 경계: 앞 글자가 공백이 아니고 같은 문자 종류(한글-한글, 라틴-라틴)면 거기서
   시작하지 않는다.
-  끝 경계는 보지 않는다(조사·활용: "얼라인을", "싱크해서").
+  끝 경계(ends_word): 라틴 뒤 라틴 금지, 한글 뒤에는 조사·활용 글자만("얼라인을" O, "싱크대" X).
 - 대소문자는 ASCII만 접는다.
 """
 
@@ -53,11 +53,7 @@ class Trie:
         out: list[Match] = []
         i = 0
         while i < len(low):
-            if (
-                i > 0
-                and not text[i - 1].isspace()
-                and scalar_class(text[i - 1]) == scalar_class(text[i])
-            ):
+            if i > 0 and not text[i - 1].isspace() and same_word(text[i - 1], text[i]):
                 i += 1
                 continue
             node: dict[str, object] = self._root
@@ -67,14 +63,47 @@ class Trie:
                 node = node[low[j]]  # type: ignore[assignment]
                 j += 1
                 key = node.get("$")
-                if isinstance(key, str):
-                    best = (j, key)
+                if isinstance(key, str) and ends_word(text, j):
+                    best = (j, key)  # 끝 경계를 지키는 것 중 가장 긴 것
             if best is not None:
                 out.append(Match(i, best[0], best[1], text[i : best[0]]))
                 i = best[0]
             else:
                 i += 1
         return out
+
+
+def same_word(prev: str, ch: str) -> bool:
+    """앞 글자와 같은 단어로 이어지는지(같은 문자 종류)."""
+    return scalar_class(prev) == scalar_class(ch)
+
+
+# 한글 용어 바로 뒤에 붙어도 되는 글자: 조사·서술격·하다/되다/치다 활용·복수(들).
+# 그 밖의 한글이 붙으면 다른 낱말이다("머지않아", "싱크대", "버퍼링", "푸시업", "공수표").
+HANGUL_FOLLOWERS = frozenset(
+    "을를이가은는도만의로으랑과와에께서"  # 조사
+    "인일입이였예야요라고며면나"  # 서술격(이다) 활용
+    "하해했합한할함하던됐돼된될되됩"  # 하다·되다
+    "치쳐쳤칠칩친"  # 치다(얼라인 치다)
+    "들까부보처"  # 들, 까지, 부터, 보다, 처럼
+)
+
+
+def ends_word(text: str, end: int) -> bool:
+    """`end` 위치에서 낱말이 끝나는지(끝 경계, ADR-0018 오탐 관문).
+
+    - 라틴·숫자 뒤에 라틴·숫자가 이어지면 아니다("special", "Next.js"의 Next는 '.'이라 통과 →
+      사전에서 뺀다).
+    - 한글 뒤에는 조사·활용 글자만 올 수 있다(HANGUL_FOLLOWERS).
+    """
+    if end >= len(text) or end == 0:
+        return True
+    last, nxt = text[end - 1], text[end]
+    if scalar_class(last) == "L":
+        return scalar_class(nxt) != "L"
+    if scalar_class(last) == "H" and scalar_class(nxt) == "H":
+        return nxt in HANGUL_FOLLOWERS
+    return True
 
 
 # 한국어 조사: 앞말의 받침에 따라 모양이 바뀐다. (받침 있을 때, 없을 때)
@@ -113,6 +142,11 @@ _LIGHT_VERBS: dict[str, str] = {
     " 쳐야": " 해야",
     " 치고": " 하고",
 }
+# 붙여 쓴 꼴("얼라인쳐 주세요")도 같게 본다.
+_LIGHT_VERBS.update({k.lstrip(): v for k, v in list(_LIGHT_VERBS.items())})
+
+# 서술격 조사(이다): 받침 없는 말 뒤에서는 '이'가 빠진다("출시이에요" → "출시예요").
+_COPULA_DROP = ("이라", "이고", "이야", "이었", "이니", "이면", "이다", "이지", "이죠")
 
 _JOSA_TAILS = ("는", "도", "만", "의")
 
@@ -143,6 +177,22 @@ def fix_josa(replacement: str, following: str) -> str:
     return ""
 
 
+def _fix_copula(replacement: str, rest: str) -> tuple[str, int] | None:
+    """(새로 쓸 글자, 원문에서 건너뛸 길이). 고칠 것이 없으면 None."""
+    batchim = _has_batchim(replacement[-1]) if replacement else None
+    if batchim is None:
+        return None
+    if rest.startswith("이에요") and not batchim:
+        return "예요", 3
+    if rest.startswith("예요") and batchim:
+        return "이에요", 2
+    if not batchim:
+        for form in _COPULA_DROP:
+            if rest.startswith(form):
+                return form[1:], len(form)
+    return None
+
+
 def substitute(text: str, matches: list[Match], plain_of: dict[str, str]) -> str:
     """원문의 용어 자리에 쉬운 말을 넣는다. 바로 뒤 조사도 받침에 맞게 고친다."""
     out: list[str] = []
@@ -160,6 +210,11 @@ def substitute(text: str, matches: list[Match], plain_of: dict[str, str]) -> str
             # "얼라인 쳐주세요" → "방향 맞추기 해 주세요": 판교어에 붙는 '치다'는 '하다'로.
             out.append(_LIGHT_VERBS[light])
             cursor += len(light)
+            continue
+        copula = _fix_copula(plain, rest)
+        if copula is not None:
+            out.append(copula[0])
+            cursor += copula[1]
             continue
         fixed = fix_josa(plain, rest)
         if fixed:

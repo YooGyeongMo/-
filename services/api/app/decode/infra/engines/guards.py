@@ -9,6 +9,7 @@
 """
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime
 
 from app.core.kv import KeyValue
@@ -55,7 +56,20 @@ class Quota:
         return await self._kv.incr(rpd_key, 26 * 3600) <= self._rpd_cap
 
 
+@dataclass(frozen=True)
+class BreakerPass:
+    """`allow()`가 내준 통과권. 프로브(HALF_OPEN 시험 호출)인지 기억해 결과 보고에 쓴다."""
+
+    probe: bool
+
+
 class Breaker:
+    """결과는 통과권과 함께 보고한다(레드팀 M-2).
+
+    - 프로브 실패만 OPEN 시간을 2배로 늘린다. 이미 열린 뒤 늦게 도착한 일반 실패·성공은 무시한다
+      (동시 실패 5건이 한 번에 최대치까지 열거나, 느린 성공이 OPEN 을 닫지 않게).
+    """
+
     def __init__(self, kv: KeyValue, engine: str) -> None:
         self._kv = kv
         base = f"ai:breaker:{engine}"
@@ -71,26 +85,37 @@ class Breaker:
             return "HALF_OPEN"
         return "CLOSED"
 
-    async def allow(self) -> bool:
+    async def allow(self) -> BreakerPass | None:
         state = await self.state()
         if state == "OPEN":
-            return False
+            return None
         if state == "HALF_OPEN":
-            return await self._kv.set_nx(self._probe, "1", PROBE_LOCK_SEC)
-        return True
+            got = await self._kv.set_nx(self._probe, "1", PROBE_LOCK_SEC)
+            return BreakerPass(probe=True) if got else None
+        return BreakerPass(probe=False)
 
-    async def success(self) -> None:
-        for key in (self._fails, self._open, self._backoff, self._probe):
-            await self._kv.delete(key)
+    async def success(self, ticket: BreakerPass) -> None:
+        if ticket.probe:
+            for key in (self._fails, self._open, self._backoff, self._probe):
+                await self._kv.delete(key)
+        elif await self.state() == "CLOSED":
+            await self._kv.delete(self._fails)
 
-    async def failure(self) -> None:
-        backoff = await self._kv.get(self._backoff)
-        if backoff is not None:  # HALF_OPEN 프로브 실패 → 더 길게 연다
-            seconds = min(int(backoff) * 2, MAX_OPEN_SEC)
+    async def failure(self, ticket: BreakerPass) -> None:
+        if ticket.probe:
+            backoff = await self._kv.get(self._backoff)
+            seconds = min(int(backoff or OPEN_SEC) * 2, MAX_OPEN_SEC)
             await self._trip(seconds)
             return
+        if await self.state() != "CLOSED":
+            return  # 이미 열렸다
         if await self._kv.incr(self._fails, FAIL_WINDOW_SEC) >= FAILS_TO_OPEN:
             await self._trip(OPEN_SEC)
+
+    async def release(self, ticket: BreakerPass) -> None:
+        """실패로 치지 않는 결과(안전 필터 차단 등). 프로브 락만 푼다."""
+        if ticket.probe:
+            await self._kv.delete(self._probe)
 
     async def _trip(self, seconds: int) -> None:
         await self._kv.set(self._open, "1", seconds)

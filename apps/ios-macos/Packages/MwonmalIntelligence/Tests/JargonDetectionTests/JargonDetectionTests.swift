@@ -28,6 +28,56 @@ struct DictionaryTrieTests {
         #expect(trie.find(in: "인싱크로", boundary: false).map(\.range) == [span(1, 3)])
     }
 
+    /// 서버(`services/api/app/decode/domain/matching.py`)와 같은 정답 벡터. 규칙이 한쪽만 바뀌면 여기서 깨진다.
+    @Test func sharedVectorsMatchServer() throws {
+        struct Vectors: Decodable {
+            struct Case: Decodable {
+                let text: String
+                let spans: [[Span]]
+            }
+
+            enum Span: Decodable {
+                case int(Int), key(String)
+                init(from decoder: any Decoder) throws {
+                    let c = try decoder.singleValueContainer()
+                    if let i = try? c.decode(Int.self) {
+                        self = .int(i)
+                    } else {
+                        self = try .key(c.decode(String.self))
+                    }
+                }
+            }
+
+            let dictionary: [String: String]
+            let cases: [Case]
+        }
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // JargonDetectionTests
+            .deletingLastPathComponent() // Tests
+            .deletingLastPathComponent() // MwonmalIntelligence
+            .deletingLastPathComponent() // Packages
+            .deletingLastPathComponent() // ios-macos
+            .deletingLastPathComponent() // apps
+            .deletingLastPathComponent() // 저장소 루트
+            .appendingPathComponent("packages/test-vectors/jargon_match.json")
+        let v = try JSONDecoder().decode(Vectors.self, from: Data(contentsOf: url))
+        let trie = DictionaryTrie(terms: v.dictionary.keys)
+        for c in v.cases {
+            let got: [String] = trie.find(in: c.text).map { s in
+                "\(s.range.start),\(s.range.end),\(v.dictionary[s.termKey ?? ""] ?? "?")"
+            }
+            let want: [String] = c.spans.map { parts in
+                parts.map { p -> String in
+                    switch p {
+                    case let .int(i): String(i)
+                    case let .key(k): k
+                    }
+                }.joined(separator: ",")
+            }
+            #expect(got == want, "\(c.text)")
+        }
+    }
+
     @Test func bundledSeedLoads() throws {
         let seed = try HybridJargonDetector.bundledSeedTrie()
         #expect(seed.termCount >= 12)

@@ -149,20 +149,24 @@ async def test_breaker_transitions() -> None:
     kv = MemoryKV(clock=lambda: clock[0])
     b = Breaker(kv, "g")
     assert await b.state() == "CLOSED"
-    await b.failure()
+    t = await b.allow()
+    assert t is not None and not t.probe
+    await b.failure(t)
     assert await b.state() == "CLOSED"
-    await b.failure()  # 30초 안 2번 → OPEN
+    await b.failure(t)  # 30초 안 2번 → OPEN 60초
     assert await b.state() == "OPEN"
-    assert not await b.allow()
+    assert await b.allow() is None
     clock[0] = 61
     assert await b.state() == "HALF_OPEN"
-    assert await b.allow()  # 프로브 1개
-    assert not await b.allow()  # 두 번째는 막힌다(락)
-    await b.failure()  # 프로브 실패 → 120초 OPEN
+    probe = await b.allow()
+    assert probe is not None and probe.probe
+    assert await b.allow() is None  # 두 번째는 막힌다(락)
+    await b.failure(probe)  # 프로브 실패 → 120초 OPEN
     assert await b.state() == "OPEN"
     clock[0] = 61 + 121
-    assert await b.allow()
-    await b.success()
+    probe = await b.allow()
+    assert probe is not None and probe.probe
+    await b.success(probe)
     assert await b.state() == "CLOSED"
 
 
@@ -171,7 +175,54 @@ async def test_breaker_failures_spread_out_do_not_open() -> None:
     clock = [0.0]
     kv = MemoryKV(clock=lambda: clock[0])
     b = Breaker(kv, "g")
-    await b.failure()
+    t = await b.allow()
+    assert t is not None
+    await b.failure(t)
     clock[0] = 31
-    await b.failure()
+    await b.failure(t)
     assert await b.state() == "CLOSED"
+
+
+@pytest.mark.anyio
+async def test_breaker_concurrent_failures_open_once_for_60s() -> None:
+    """레드팀 M-2: 동시 실패 5건이 OPEN 을 480초까지 키우면 안 된다."""
+    clock = [0.0]
+    kv = MemoryKV(clock=lambda: clock[0])
+    b = Breaker(kv, "g")
+    tickets = [await b.allow() for _ in range(5)]
+    for t in tickets:
+        assert t is not None
+        await b.failure(t)
+    clock[0] = 61
+    assert await b.state() == "HALF_OPEN"
+
+
+@pytest.mark.anyio
+async def test_breaker_late_success_does_not_close_open() -> None:
+    clock = [0.0]
+    kv = MemoryKV(clock=lambda: clock[0])
+    b = Breaker(kv, "g")
+    slow = await b.allow()
+    t = await b.allow()
+    assert slow is not None and t is not None
+    await b.failure(t)
+    await b.failure(t)
+    await b.success(slow)  # 열리기 전에 출발한 느린 성공
+    assert await b.state() == "OPEN"
+
+
+@pytest.mark.anyio
+async def test_breaker_release_frees_probe_without_counting() -> None:
+    clock = [0.0]
+    kv = MemoryKV(clock=lambda: clock[0])
+    b = Breaker(kv, "g")
+    t = await b.allow()
+    assert t is not None
+    await b.failure(t)
+    await b.failure(t)
+    clock[0] = 61
+    probe = await b.allow()
+    assert probe is not None
+    await b.release(probe)
+    assert await b.state() == "HALF_OPEN"
+    assert await b.allow() is not None

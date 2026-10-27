@@ -11,6 +11,7 @@
 
 import logging
 import time
+from collections.abc import Awaitable
 from dataclasses import dataclass
 
 from app.core.errors import DomainError, ErrorCode
@@ -43,31 +44,50 @@ class EngineRouter:
         self._allow_degraded = allow_degraded
 
     async def decode(self, request: EngineRequest, *, consent: bool) -> tuple[EngineResult, int]:
-        """(결과, 지연 ms)."""
+        """(결과, 지연 ms). 외부 엔진에서 무슨 일이 나도 500 이 아니라 강등(또는 503)이다(레드팀
+        M-1)."""
         started = time.perf_counter()
         ext = self._external
         skip = self._skip_reason(consent)
         if skip is None and ext is not None:
-            if not await ext.breaker.allow():
-                skip = "BREAKER_OPEN"
-            elif not await ext.quota.take():
+            try:
+                ticket = await ext.breaker.allow()
+                has_quota = ticket is not None and await ext.quota.take()
+            except Exception as e:  # noqa: BLE001 - Redis 장애 등: 외부 엔진만 건너뛴다
+                log.warning("ai_guard_unavailable type=%s", type(e).__name__)
+                ticket, has_quota, skip = None, False, "GUARD_DOWN"
+            if ticket is None:
+                skip = skip or "BREAKER_OPEN"
+            elif not has_quota:
                 skip = "QUOTA_SKIP"
+                await self._safely(ext.breaker.release(ticket))
             else:
                 try:
                     result = await ext.engine.decode(request)
-                except EngineError as e:
-                    await ext.breaker.failure()
-                    _record(ext.engine.name, ext.model, f"error:{e.reason}", started)
+                except Exception as e:  # noqa: BLE001 - 제공자 쪽 무엇이든 실패로 센다
+                    reason = e.reason if isinstance(e, EngineError) else f"bug:{type(e).__name__}"
+                    counts = not isinstance(e, EngineError) or e.counts_as_failure
+                    await self._safely(
+                        ext.breaker.failure(ticket) if counts else ext.breaker.release(ticket)
+                    )
+                    _record(ext.engine.name, ext.model, f"error:{reason}", started)
                     if not self._allow_degraded:
                         raise DomainError(
                             ErrorCode.AI_UNAVAILABLE,
                             "해석 엔진이 잠깐 멍때리는 중이에요. 다시 시도해 주세요.",
                         ) from None
                 else:
-                    await ext.breaker.success()
+                    await self._safely(ext.breaker.success(ticket))
                     return result, _record(ext.engine.name, ext.model, "ok", started)
         result = await self._fallback.decode(request)
         return result, _record(self._fallback.name, "dictionary", f"ok skip={skip}", started)
+
+    @staticmethod
+    async def _safely(op: Awaitable[None]) -> None:
+        try:
+            await op
+        except Exception as e:  # noqa: BLE001 - 보고 실패로 사용자 요청을 깨지 않는다
+            log.warning("ai_guard_report_failed type=%s", type(e).__name__)
 
     def _skip_reason(self, consent: bool) -> str | None:
         if not consent:

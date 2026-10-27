@@ -36,8 +36,9 @@ public struct DictionaryTrie: Sendable {
         nodes[node].term = term
     }
 
-    /// `boundary == true`: 앞 글자와 같은 문자 종류(한글-한글, 라틴-라틴)면 그 위치에서 시작하지 않는다.
-    /// 끝 경계는 보지 않는다(한국어 조사·활용: "얼라인을", "싱크해서").
+    /// `boundary == true`: 앞 글자와 같은 문자 종류(한글-한글, 라틴-라틴)면 그 위치에서 시작하지 않고,
+    /// 끝 경계도 본다(서버 `matching.ends_word`와 같다): 라틴 뒤에 라틴이 오면 아니고, 한글 뒤에는 조사·활용 글자만
+    /// 올 수 있다("얼라인을" O, "싱크대" X). 정답은 `packages/test-vectors/jargon_match.json`.
     public func find(in text: String, boundary: Bool = true) -> [JargonSpan] {
         let raw = Array(text.unicodeScalars)
         let low = raw.map(Self.fold)
@@ -53,7 +54,7 @@ public struct DictionaryTrie: Sendable {
             while probe < low.count, let next = nodes[node].children[low[probe]] {
                 node = next
                 probe += 1
-                if let term = nodes[node].term {
+                if let term = nodes[node].term, !boundary || Self.endsWord(raw, at: probe) {
                     best = (probe, term)
                 }
             }
@@ -66,6 +67,24 @@ public struct DictionaryTrie: Sendable {
             }
         }
         return out
+    }
+
+    /// 한글 용어 바로 뒤에 붙어도 되는 글자(서버 `HANGUL_FOLLOWERS`와 같은 목록).
+    static let hangulFollowers: Set<Unicode.Scalar> = Set(
+        ("을를이가은는도만의로으랑과와에께서" + "인일입이였예야요라고며면나" + "하해했합한할함하던됐돼된될되됩" + "치쳐쳤칠칩친" + "들까부보처").unicodeScalars
+    )
+
+    /// `end`에서 낱말이 끝나는지.
+    private static func endsWord(_ raw: [Unicode.Scalar], at end: Int) -> Bool {
+        guard end > 0, end < raw.count else { return true }
+        let last = ScalarClass(raw[end - 1]), next = ScalarClass(raw[end])
+        if last == .latin {
+            return next != .latin
+        }
+        if last == .hangul, next == .hangul {
+            return hangulFollowers.contains(raw[end])
+        }
+        return true
     }
 
     /// 앞 글자가 공백이 아니고 같은 문자 종류면 단어 중간이다(시작 경계 아님).

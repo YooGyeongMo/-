@@ -5,6 +5,7 @@ int64 를 넘는 id 는 "그런 자원은 없다"(404)로 답한다.
 페이지 번호에는 상한이 없다 → 아주 큰 값은 빈 페이지로 답한다(DB 오프셋 넘침 방지).
 """
 
+import re
 from typing import Annotated
 
 from fastapi import Path, Query
@@ -26,11 +27,12 @@ def in_int64(value: int) -> bool:
 
 
 def require_id(raw: str, code: ErrorCode, message: str) -> int:
-    try:
-        value = int(raw)
-    except ValueError:
-        raise DomainError(code, message) from None
-    if not in_int64(value) or not raw.strip().lstrip("-").isdigit():
+    # ASCII 숫자만(전각·아랍 숫자·공백·앞자리 0 은 다른 표기로 같은 id 를 가리키게 된다, 레드팀
+    # L-1).
+    if not re.fullmatch(r"-?(0|[1-9][0-9]*)", raw):
+        raise DomainError(code, message)
+    value = int(raw)
+    if not in_int64(value):
         raise DomainError(code, message)
     return value
 

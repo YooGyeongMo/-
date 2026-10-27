@@ -3,6 +3,7 @@
 원문은 이 함수 밖 로그·예외 어디에도 싣지 않는다(카나리 테스트, REQ-14).
 """
 
+import unicodedata
 from typing import Protocol
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,6 +14,13 @@ from app.decode.domain.model import EngineRequest, EngineResult, NewTerm, Span
 from app.decode.infra import repository as repo
 
 NEW_TERM_CONFIDENCE = 0.7
+
+
+def visible(text: str) -> bool:
+    """공백·서식 문자(ZWSP 등)만으로 된 입력은 내용이 없다."""
+    return any(
+        not ch.isspace() and unicodedata.category(ch) not in ("Cf", "Cc", "Zs") for ch in text
+    )
 
 
 class Router(Protocol):
@@ -56,7 +64,10 @@ async def translate(
     source_image_url: str | None,
     consent: bool,
 ) -> int:
-    if not source_text.strip():
+    # 한글 자모가 풀려 들어온 입력(NFD)도 사전에 맞도록 NFC 로 저장·매칭한다. 인덱스는 저장한 원문
+    # 기준.
+    source_text = unicodedata.normalize("NFC", source_text)
+    if not visible(source_text):
         raise DomainError(ErrorCode.INVALID_INPUT, "문장을 입력해 주세요.", "sourceText")
     project = await repo.resolve_project(s, user_id, project_id)
     if meeting_id is not None:
@@ -69,6 +80,9 @@ async def translate(
         meeting_id=meeting_id,
         direction=direction,
         source_text=source_text,
+        input_source=input_source,
+        source_image_url=source_image_url,
+        consent=consent,
     )
     if reused is not None:
         return reused

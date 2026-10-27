@@ -12,6 +12,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 
 import sqlalchemy as sa
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import DomainError, ErrorCode
@@ -83,6 +84,25 @@ class Dictionary:
 
 
 _ALIASES = {t.slug: t.aliases for t in TERMS}
+
+# 영어 원어 중 그대로 매칭해도 되는 것(판교어로만 쓰이는 짧은 낱말). 그 밖의 한 낱말 영어(next,
+# hold, drop,
+# input, spec …)는 평범한 영어 문장에서 오탐이 나서 매칭하지 않는다(레드팀 H-1, ADR-0018).
+LATIN_ALLOW = frozenset({"align", "asap", "1on1", "fyi", "eod"})
+
+
+def usable_surface(surface: str) -> bool:
+    """사전 매칭에 쓸 표기인지. 한글이 섞이면 그대로 쓴다. 영어만이면 약어·여러 낱말·허용 목록만."""
+    if not surface.isascii():
+        return True
+    if surface.lower() in LATIN_ALLOW:
+        return True
+    if any(c in " -&/:" for c in surface):
+        return True  # "scope out", "kick-off", "R&R", "A/B test"
+    letters = [c for c in surface if c.isalpha()]
+    return bool(letters) and all(c.isupper() for c in letters)  # 약어(KPI, POC)
+
+
 _cache: tuple[float, Dictionary] | None = None
 
 
@@ -109,8 +129,7 @@ async def load_dictionary(s: AsyncSession) -> Dictionary:
     for r in rows:
         terms[r.slug] = DictTerm(r.id, r.slug, r.term_ko, r.plain_ko)
         for surface in (r.term_ko, r.origin_en, *_ALIASES.get(r.slug, ())):
-            # 2글자 미만 영어 원어(예: "P0" 제외 없음)는 그대로, 빈 값만 거른다.
-            if surface and surface.strip():
+            if surface and surface.strip() and usable_surface(surface.strip()):
                 surfaces.setdefault(surface.strip(), r.slug)
     d = Dictionary(Trie(surfaces), terms)
     _cache = (now, d)
@@ -159,43 +178,50 @@ async def resolve_project(s: AsyncSession, user_id: int, project_id: int | None)
     return await ensure_default_project(s, user_id)
 
 
-async def ensure_default_project(s: AsyncSession, user_id: int) -> ProjectRef:
-    """온보딩을 건너뛴 사용자의 "내 프로젝트". 없으면 만들고 현재 프로젝트로 고른다."""
+async def _default_project(s: AsyncSession, user_id: int) -> ProjectRef | None:
     row = (
         await s.execute(
             sa.select(_projects.c.id, _projects.c.name)
-            .where(_projects.c.user_id == user_id, _projects.c.is_default.is_(True))
-            .order_by(_projects.c.id)
-            .limit(1)
+            .where(_projects.c.user_id == user_id, _projects.c.name == DEFAULT_PROJECT_NAME)
+            .with_for_update(read=True)
         )
     ).first()
     if row is None:
-        name = DEFAULT_PROJECT_NAME
-        taken = (
+        row = (
             await s.execute(
-                sa.select(_projects.c.id).where(
-                    _projects.c.user_id == user_id, _projects.c.name == name
-                )
+                sa.select(_projects.c.id, _projects.c.name)
+                .where(_projects.c.user_id == user_id, _projects.c.is_default.is_(True))
+                .order_by(_projects.c.id)
+                .limit(1)
             )
         ).first()
-        if taken is not None:
-            ref = ProjectRef(taken.id, name)
-        else:
-            await s.execute(
-                _projects.insert().values(
-                    user_id=user_id, name=name, is_default=True, created_at=utcnow()
-                )
-            )
-            new_id: int = (
+    return None if row is None else ProjectRef(row.id, row.name)
+
+
+async def ensure_default_project(s: AsyncSession, user_id: int) -> ProjectRef:
+    """온보딩을 건너뛴 사용자의 "내 프로젝트". 없으면 만들고 현재 프로젝트로 고른다.
+
+    첫 해석을 동시에 여러 번 보내도(두 번 누름·재시도) 하나만 생긴다: 유니크 위반은 SAVEPOINT 로
+    받고
+    먼저 만들어진 행을 다시 읽는다(레드팀 H-3).
+    """
+    ref = await _default_project(s, user_id)
+    if ref is None:
+        try:
+            async with s.begin_nested():
                 await s.execute(
-                    sa.select(_projects.c.id).where(
-                        _projects.c.user_id == user_id, _projects.c.name == name
+                    _projects.insert().values(
+                        user_id=user_id,
+                        name=DEFAULT_PROJECT_NAME,
+                        is_default=True,
+                        created_at=utcnow(),
                     )
                 )
-            ).scalar_one()
-            ref = ProjectRef(new_id, name)
-    else:
-        ref = ProjectRef(row.id, row.name)
+        except IntegrityError:
+            pass  # 다른 요청이 막 만들었다 → 아래에서 다시 읽는다
+        ref = await _default_project(s, user_id)
+        if ref is None:  # 이론상 없음(만들었거나 남이 만들었다)
+            raise DomainError(ErrorCode.PROJECT_NOT_FOUND, "프로젝트를 찾을 수 없어요.")
     await s.execute(_users.update().where(_users.c.id == user_id).values(current_project_id=ref.id))
     return ref
 
@@ -226,24 +252,42 @@ async def recent_duplicate(
     meeting_id: int | None,
     direction: str,
     source_text: str,
+    input_source: str,
+    source_image_url: str | None,
+    consent: bool,
 ) -> int | None:
-    """10분 안에 같은 원문을 같은 곳에 해석했으면 그 기록을 다시 쓴다(중복 저장·AI 호출 방지)."""
+    """10분 안에 같은 원문을 같은 곳·같은 입력으로 해석했으면 그 기록을 다시 쓴다(중복 저장·AI
+    호출 방지).
+
+    - 원문 비교는 파이썬에서 한 번 더 한다(MySQL 기본 collation 은 대소문자·악센트를 무시한다).
+    - 이번엔 AI 동의를 했는데 지난 결과가 사전 간이 해석이면 다시 쓰지 않는다(레드팀 M-5).
+    """
     stmt = (
-        sa.select(Translation.id)
+        sa.select(Translation.id, Translation.source_text, Translation.ai_model)
         .where(
             Translation.user_id == user_id,
             Translation.project_id == project_id,
             Translation.direction == direction,
+            Translation.input_source == input_source,
             Translation.source_text == source_text,
             Translation.created_at >= utcnow() - REUSE_WINDOW,
             Translation.meeting_id.is_(None)
             if meeting_id is None
             else Translation.meeting_id == meeting_id,
+            Translation.source_image_url.is_(None)
+            if source_image_url is None
+            else Translation.source_image_url == source_image_url,
         )
         .order_by(Translation.id.desc())
-        .limit(1)
+        .limit(5)
     )
-    return (await s.execute(stmt)).scalar()
+    for row in (await s.execute(stmt)).all():
+        if row.source_text != source_text:
+            continue
+        if consent and str(row.ai_model).startswith("none/"):
+            return None
+        return int(row.id)
+    return None
 
 
 @dataclass(frozen=True)

@@ -73,9 +73,12 @@ class EngineResult:
 class EngineError(Exception):
     """엔진 실패. 제공자 응답 본문·원문은 절대 싣지 않는다(REQ-14). reason 은 짧은 기술 코드."""
 
-    def __init__(self, reason: str) -> None:
+    def __init__(self, reason: str, *, counts_as_failure: bool = True) -> None:
         super().__init__(reason)
         self.reason = reason
+        # 안전 필터 차단처럼 제공자가 멀쩡한 경우는 브레이커에 세지 않는다(한 사용자가 모두를 막지
+        # 않게).
+        self.counts_as_failure = counts_as_failure
 
 
 class Engine(Protocol):

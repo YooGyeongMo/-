@@ -1,128 +1,234 @@
 """사전만으로 하는 간이 해석의 규칙(엔진 `none`, ADR-0008 강등 경로).
 
 원문을 밖으로 보내지 않고 서버 안에서만 계산한다. AI만큼 정확하지 않으므로 뉘앙스 확신도는
-낮게(0.6) 둔다.
-모든 규칙은 순수 함수다(시각은 인자로 받는다).
+낮게(0.6) 둔다. 모든 규칙은 순수 함수다(시각은 인자로 받는다).
+레드팀 1차(2026-10-27) 반영: 기한 = 날짜 + 시각 합치기, 문장 꼬리(이모지·ㅎㅎ·^^·~) 무시,
+"~해 주세요" 밖의 동사도 할 일 꼴로, 물음표는 결정보다 먼저.
 """
 
 import re
+import unicodedata
 from datetime import datetime, timedelta
 
 from app.decode.domain.model import ActionDraft, Nuance
 
 KST_OFFSET = timedelta(hours=9)
-END_OF_DAY_HOUR = 18  # 기한 시각을 모를 때 그날 18:00(KST)
+END_OF_DAY_HOUR = 18  # 날짜만 있으면 그날 18:00(KST)
+NUANCE_CONFIDENCE = 0.6
 
-_SENTENCE = re.compile(r"[^.!?\n。]+[.!?。]*")
+_SENTENCE = re.compile(r"[^.!?\n。~]+[.!?。~]*")
 
 _REQUEST_END = re.compile(
-    r"(주세요|주시면|주실 수 있을까요|주시겠어요|주시길"
-    r"|부탁(드려요|드립니다|해요|합니다|드릴게요)?|바랍니다"
-    r"|해 ?줘|해야 (해요|합니다|돼요)|하셔야)[\s.!?~]*$"
+    r"(주세요|주시면(\s?감사하겠습니다|\s?감사합니다|\s?좋겠어요|\s?돼요)?|주실 수 있을까요"
+    r"|주시겠어요|주시길|부탁(드려요|드립니다|해요|합니다|드릴게요)?|바랍니다|해 ?줘"
+    r"|해야 (해요|합니다|돼요)|하셔야|마세요)$"
 )
 _DECISION = re.compile(r"(밀죠|가죠|하죠|합시다|하기로 (했|해)|진행할게요|확정|드랍|빼죠|접죠)")
+_NOT_DECIDED = re.compile(r"(확정(은|이)? 아니|미정|아직 확정)")
 _DECLINE = re.compile(
     r"(어려울 것 같|챌린지가 있|힘들 것 같|일단 (팔로업|검토)|검토해 ?보겠|고민해 ?보겠"
     r"|쉽지 않|나중에 (보|챙기)죠)"
 )
-_QUESTION = re.compile(r"(\?|까요|나요|가요|인가요|을지|ㄹ지)[\s~]*$")
+_QUESTION = re.compile(r"(\?|까요|나요|가요|인가요|을지|ㄹ지)$")
+# 할 일로 보지 않는 것("참고 부탁드려요" → 할 일 "참고").
+_NOT_TODO = frozenset({"참고", "양해", "이해", "확인", "잘", "감사"})
 
-_LEAD_IN = re.compile(r"^(그리고|그 전에|그전에|일단|우선|그럼|그러면|아 |네 |넵 )\s*")
-# 끝맺음 → "~하기" 꼴로 줄인다(할 일 목록에 맞는 모양).
-_TO_TODO: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\s*해\s?주(세요|시면|실 수 있을까요|시겠어요|시길)[\s.!?~]*$"), "하기"),
-    (re.compile(r"\s*해\s?줘[\s.!?~]*$"), "하기"),
-    (re.compile(r"\s*해야 (해요|합니다|돼요)[\s.!?~]*$"), "하기"),
-    (re.compile(r"\s*(을|를)?\s*부탁(드려요|드립니다|해요|합니다|드릴게요)?[\s.!?~]*$"), ""),
-    (re.compile(r"\s*바랍니다[\s.!?~]*$"), ""),
-    (re.compile(r"[\s.!?~]+$"), ""),
-)
+_LEAD_IN = re.compile(r"^(그리고|그 전에|그전에|일단|우선|그럼|그러면|아|네|넵)[ ,]+")
+# 동사 어간 + 아/어 + 주세요 → ~기 (올려 주세요 → 올리기). 끝 글자 → 기본형 마지막 글자.
+_STEM_TAIL = {
+    "려": "리",
+    "겨": "기",
+    "춰": "추",
+    "꿔": "꾸",
+    "봐": "보",
+    "와": "오",
+    "써": "쓰",
+    "줘": "주",
+}
+_POLITE_END = r"(\s?주(세요|시면|실 수 있을까요|시겠어요|시길)|\s?줘)"
 
-_DUE = re.compile(
-    r"(오늘 ?중|오늘|EOD|퇴근 ?전|아삽|ASAP|최대한 빨리|내일|모레|이번 ?주|다음 ?주|다음 스프린트"
-    r"|[월화수목금토일]요일|\d{1,2}시)"
-    r"(까지| 안에| 중으로| 오전| 오후)?",
-    re.IGNORECASE,
-)
-_WEEKDAY = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5, "일": 6}
+
+def strip_tail(sentence: str) -> str:
+    """문장 끝의 이모지·자모 웃음·^^·~·서식 문자를 걷어 낸다(요청 끝맺음을 보려고)."""
+    s = sentence.rstrip()
+    while s:
+        ch = s[-1]
+        code = ord(ch)
+        if (
+            ch.isspace()
+            or ch in "~^.!。"
+            or unicodedata.category(ch) in ("So", "Sk", "Cf", "Mn", "Me")
+            or 0x3131 <= code <= 0x318E  # ㅎㅋㅠㅜ 같은 자모
+            or 0x1F000 <= code <= 0x1FAFF
+        ):
+            s = s[:-1]
+            continue
+        break
+    return s
 
 
 def sentences(text: str) -> list[str]:
     return [s.strip() for s in _SENTENCE.findall(text) if s.strip()]
 
 
+_TODO_RULES: tuple[tuple[str, str], ...] = (
+    (r"(\s?)해" + _POLITE_END + r"$", r"\1하기"),
+    (r"(\s?)해야 (해요|합니다|돼요)$", r"\1하기"),
+    (r"(\s?)하셔야( (해요|합니다|돼요))?$", r"\1하기"),
+    (r"\s?(도|을|를)?\s?부탁(드려요|드립니다|해요|합니다|드릴게요)?$", ""),
+    (r"\s?(을|를)?\s?주시면\s?(감사하겠습니다|감사합니다|좋겠어요|돼요)$", ""),
+    (r"\s?바랍니다$", ""),
+    (r"지\s?마세요$", "지 않기"),
+)
+
+
 def to_todo(sentence: str) -> str:
-    text = _LEAD_IN.sub("", sentence.strip())
-    for pattern, repl in _TO_TODO:
-        new = pattern.sub(repl, text)
+    text = _LEAD_IN.sub("", strip_tail(sentence).strip())
+    for pattern, repl in _TODO_RULES:
+        new = re.sub(pattern, repl, text)
         if new != text:
             text = new
             break
+    else:
+        m = re.search(r"(\S*?)(\S)" + _POLITE_END + r"$", text)
+        if m:
+            stem, last = m.group(1), m.group(2)
+            if last in _STEM_TAIL:
+                base = stem + _STEM_TAIL[last]
+            elif last in ("어", "아"):
+                base = stem  # 만들어 → 만들, 잡아 → 잡
+            elif last == "여":
+                base = stem + "이"  # 붙여 → 붙이
+            elif last == "내":
+                base = stem + last  # 보내 → 보내
+            else:
+                base = ""  # "피드백 주세요": 이름씨 + 주세요 → "피드백 주기"
+            text = text[: m.start()] + (base + "기" if base else m.group(1) + m.group(2) + " 주기")
+    text = re.sub(r"\s잘$", "", text)  # "관리 잘 부탁" → "관리"
     text = re.sub(r"기\s?하기$", "기", text)  # "방향 맞추기하기" → "방향 맞추기"
     return text.strip(" ,")
 
 
+# ---------- 기한 ----------
+
+_DATE = re.compile(
+    r"(오늘\s?중|오늘|EOD|퇴근\s?전|아삽|ASAP|최대한\s?빨리|내일|모레"
+    r"|(?:(이번|다음)\s?주\s?)?([월화수목금토일])요일|이번\s?주|다음\s?주|다음\s?스프린트)",
+    re.IGNORECASE,
+)
+_TIME = re.compile(
+    r"(오전|오후|아침|저녁|밤)?\s?(\d{1,2})\s?시(?!간)(\s?반)?|(오전|오후)(?=\s?(까지|중|안))"
+)
+_WEEKDAY = {"월": 0, "화": 1, "수": 2, "목": 3, "금": 4, "토": 5, "일": 6}
+
+
 def due_hint(sentence: str) -> str | None:
-    m = _DUE.search(sentence)
-    return m.group(0).strip() if m else None
+    """원문에서 기한 표현(날짜 + 시각)을 뽑아 붙인다. 없으면 None."""
+    found = [m for m in (_DATE.search(sentence), _TIME.search(sentence)) if m]
+    if not found:
+        return None
+    start = min(m.start() for m in found)
+    end = max(m.end() for m in found)
+    tail = re.match(r"(까지| 안에| 중으로)", sentence[end:])
+    return (sentence[start:end] + (tail.group(1) if tail else "")).strip()
+
+
+def _date_of(hint: str, now: datetime) -> datetime | None:
+    """그날 0시(KST). 날짜 표현이 없으면 None."""
+    m = _DATE.search(hint)
+    if not m:
+        return None
+    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    word = re.sub(r"\s", "", m.group(0)).upper()
+    if word.startswith(("오늘", "EOD", "퇴근전", "아삽", "ASAP", "최대한빨리")):
+        return day0
+    if word == "내일":
+        return day0 + timedelta(days=1)
+    if word == "모레":
+        return day0 + timedelta(days=2)
+    if m.group(3):  # X요일
+        target = _WEEKDAY[m.group(3)]
+        if m.group(2) == "다음":
+            next_monday = day0 + timedelta(days=7 - now.weekday())
+            return next_monday + timedelta(days=target)
+        return day0 + timedelta(days=(target - now.weekday()) % 7)
+    if word.startswith("이번주"):
+        return day0 + timedelta(days=max(0, 4 - now.weekday()))  # 이번 주 금요일
+    return day0 + timedelta(days=7 - now.weekday())  # 다음 주(스프린트) = 다음 주 월요일
+
+
+def _time_of(hint: str) -> tuple[int, int] | None:
+    m = _TIME.search(hint)
+    if not m:
+        return None
+    if m.group(4):  # "오전까지"·"오후까지"
+        return (12, 0) if m.group(4) == "오전" else (END_OF_DAY_HOUR, 0)
+    period, hour = m.group(1), int(m.group(2))
+    minute = 30 if m.group(3) else 0
+    if hour > 24:
+        return None
+    if period in ("오후", "저녁", "밤") and hour < 12:
+        hour += 12
+    elif period is None and 1 <= hour <= 6:
+        hour += 12  # 근무 시간: "3시까지" = 오후 3시
+    return (hour % 24, minute)
 
 
 def due_at(hint: str | None, now_utc: datetime) -> datetime | None:
-    """기한 힌트 → 알림 기준 시각(UTC naive). 모르는 힌트나 이미 지난 시각이면 None."""
+    """기한 힌트 → 마감 시각(UTC naive). 모르는 힌트나 이미 지난 시각이면 None."""
     if not hint:
         return None
     now = now_utc + KST_OFFSET  # KST naive
-    today = now.replace(hour=END_OF_DAY_HOUR, minute=0, second=0, microsecond=0)
-    h = hint.replace(" ", "").upper()
-    when: datetime | None = None
-    if h.startswith(("오늘", "EOD", "퇴근전", "아삽", "ASAP", "최대한빨리")):
-        when = today
-    elif h.startswith("내일"):
-        when = today + timedelta(days=1)
-    elif h.startswith("모레"):
-        when = today + timedelta(days=2)
-    elif h.startswith("이번주"):
-        when = today + timedelta(days=max(0, 4 - now.weekday()))
-    elif h.startswith("다음주") or h.startswith("다음스프린트"):
-        when = today + timedelta(days=7 - now.weekday())  # 다음 주 월요일
-    elif h[0] in _WEEKDAY and h[1:3] == "요일":
-        ahead = (_WEEKDAY[h[0]] - now.weekday()) % 7
-        when = today + timedelta(days=ahead)
-    else:
-        m = re.match(r"(\d{1,2})시", h)
-        if m and 0 <= int(m.group(1)) <= 23:
-            hour = int(m.group(1))
-            if hour < 8:  # "3시까지" = 오후 3시
-                hour += 12
-            when = now.replace(hour=hour, minute=0, second=0, microsecond=0)
-    if when is None or when <= now:
+    day = _date_of(hint, now)
+    clock = _time_of(hint)
+    if day is None and clock is None:
+        return None
+    base = day if day is not None else now.replace(hour=0, minute=0, second=0, microsecond=0)
+    hour, minute = clock if clock is not None else (END_OF_DAY_HOUR, 0)
+    when = base.replace(hour=hour, minute=minute)
+    if clock is not None and hour == 0 and minute == 0:
+        when += timedelta(days=1)  # "0시까지" = 그날이 끝날 때
+    if when <= now:
         return None
     return when - KST_OFFSET
 
 
 def actions(plain_text: str, now_utc: datetime) -> tuple[ActionDraft, ...]:
     out: list[ActionDraft] = []
+    seen: set[str] = set()
     for s in sentences(plain_text):
-        if not _REQUEST_END.search(s) or _QUESTION.search(s):
+        core = strip_tail(s)
+        if not _REQUEST_END.search(core) or _QUESTION.search(core):
             continue
         todo = to_todo(s)
-        if len(todo) < 2:
+        if len(todo) < 2 or todo in _NOT_TODO or todo in seen:
             continue
+        seen.add(todo)
         hint = due_hint(s)
         out.append(ActionDraft(text=todo[:300], due_hint=hint, due_at=due_at(hint, now_utc)))
     return tuple(out[:5])
 
 
 def intent(source_text: str, has_actions: bool) -> str:
+    cores = [strip_tail(s) for s in sentences(source_text)]
+    if cores and all(_QUESTION.search(c) for c in cores):
+        return "QUESTION"  # "놀러 가죠?" 는 결정이 아니라 질문
     if _DECLINE.search(source_text):
         return "DECLINE"
-    if _DECISION.search(source_text):
+    if _DECISION.search(source_text) and not _NOT_DECIDED.search(source_text):
         return "DECISION"
     if has_actions:
         return "REQUEST"
-    if any(_QUESTION.search(s) for s in sentences(source_text)):
+    if any(_QUESTION.search(c) for c in cores):
         return "QUESTION"
     return "SHARE"
+
+
+def _topic(word: str) -> str:
+    """'"확정"은' / '"밀죠"는' — 받침에 맞는 보조사."""
+    code = ord(word[-1]) if word else 0
+    has_batchim = 0xAC00 <= code <= 0xD7A3 and (code - 0xAC00) % 28 != 0
+    return f'"{word}"{"은" if has_batchim else "는"}'
 
 
 def nuance(source_text: str, intent_type: str) -> Nuance | None:
@@ -130,14 +236,14 @@ def nuance(source_text: str, intent_type: str) -> Nuance | None:
         m = _DECISION.search(source_text)
         word = m.group(0) if m else "이 말"
         return Nuance(
-            note=f'"{word}"는 제안처럼 들려도 이미 정해진 내용을 알리는 말일 때가 많아요.',
+            note=f"{_topic(word)} 제안처럼 들려도 이미 정해진 내용을 알리는 말일 때가 많아요.",
             tip="되묻기보다 일정만 확인하는 편이 안전해요.",
-            confidence=0.6,
+            confidence=NUANCE_CONFIDENCE,
         )
     if intent_type == "DECLINE":
         return Nuance(
             note="돌려 말한 거절일 수 있어요. 지금은 하지 않겠다는 뜻으로 쓰일 때가 많아요.",
             tip="기한을 정해 다시 확인하거나 다른 방법을 물어보세요.",
-            confidence=0.6,
+            confidence=NUANCE_CONFIDENCE,
         )
     return None

@@ -7,6 +7,7 @@
 """
 
 import json
+import math
 from typing import Any
 
 import httpx
@@ -92,10 +93,31 @@ def _clip(value: Any, limit: int) -> str:
     return str(value).strip()[:limit]
 
 
-def parse(payload: dict[str, Any], request: EngineRequest, model: str) -> EngineResult:
+BLOCKED_REASONS = frozenset({"SAFETY", "RECITATION", "BLOCKLIST", "PROHIBITED_CONTENT", "SPII"})
+
+
+def _confidence(value: Any) -> float:
     try:
-        text = payload["candidates"][0]["content"]["parts"][0]["text"]
-        data = json.loads(text)
+        number = float(value)
+    except (TypeError, ValueError):
+        return 0.5
+    return min(max(number, 0.0), 1.0) if math.isfinite(number) else 0.5
+
+
+def parse(payload: dict[str, Any], request: EngineRequest, model: str) -> EngineResult:
+    """응답 JSON → 결과. 모양이 이상하면 EngineError 하나로만 나간다(그 밖의 예외는 내보내지
+    않는다)."""
+    if not isinstance(payload, dict):
+        raise EngineError("bad_response")
+    if (payload.get("promptFeedback") or {}).get("blockReason"):
+        raise EngineError("blocked", counts_as_failure=False)
+    try:
+        candidate = payload["candidates"][0]
+        if candidate.get("finishReason") in BLOCKED_REASONS:
+            raise EngineError("blocked", counts_as_failure=False)
+        data = json.loads(candidate["content"]["parts"][0]["text"])
+        if not isinstance(data, dict):
+            raise EngineError("bad_response")
         result = _clip(data["resultText"], 2000)
         intent = data.get("intentType")
         if intent not in INTENTS:
@@ -103,24 +125,29 @@ def parse(payload: dict[str, Any], request: EngineRequest, model: str) -> Engine
         nuance = None
         raw_nuance = data.get("nuance")
         if isinstance(raw_nuance, dict) and raw_nuance.get("note"):
-            confidence = min(max(float(raw_nuance.get("confidence", 0.5)), 0.0), 1.0)
             nuance = Nuance(
-                _clip(raw_nuance["note"], 500), _clip(raw_nuance.get("tip", ""), 300), confidence
+                _clip(raw_nuance["note"], 500),
+                _clip(raw_nuance.get("tip") or "", 300),
+                _confidence(raw_nuance.get("confidence", 0.5)),
             )
         actions: list[ActionDraft] = []
         for item in list(data.get("actionItems") or [])[:5]:
-            action_text = _clip(item.get("actionText", ""), 300)
+            if not isinstance(item, dict):
+                continue
+            action_text = _clip(item.get("actionText") or "", 300)
             if not action_text:
                 continue
             hint = item.get("dueHint")
-            hint = _clip(hint, 100) if hint else None
+            hint = _clip(hint, 100) if isinstance(hint, str) and hint.strip() else None
             actions.append(ActionDraft(action_text, hint, rules.due_at(hint, request.now)))
         new_terms = tuple(
             NewTerm(_clip(t["termKo"], 100), _clip(t["plainKo"], 200), _clip(t["matchedText"], 100))
             for t in list(data.get("newTerms") or [])[:5]
-            if t.get("termKo") and t.get("plainKo") and t.get("matchedText")
+            if isinstance(t, dict) and t.get("termKo") and t.get("plainKo") and t.get("matchedText")
         )
-    except (KeyError, IndexError, TypeError, ValueError) as e:
+    except EngineError:
+        raise
+    except (KeyError, IndexError, TypeError, ValueError, AttributeError) as e:
         raise EngineError("bad_response") from e
     if not result:
         raise EngineError("empty_result")

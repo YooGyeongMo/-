@@ -8,7 +8,7 @@ from urllib.parse import urlsplit
 
 import httpx
 from fastapi import APIRouter, Depends, Header, Query, Response
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, StrictBool, StrictInt, model_validator
 
 from app.core.auth import CurrentPrincipal, OptionalPrincipal
 from app.core.db import DbSession
@@ -26,7 +26,7 @@ from app.decode.usecases.translate import translate
 
 router = APIRouter(prefix="/api")
 
-Int64 = Annotated[int, Field(ge=INT64_MIN, le=INT64_MAX)]
+Int64 = Annotated[StrictInt, Field(ge=INT64_MIN, le=INT64_MAX)]
 Direction = Literal["JARGON_TO_PLAIN", "PLAIN_TO_JARGON"]
 InputSource = Literal["TYPED", "SCREENSHOT", "RECORDING", "EXTENSION"]
 
@@ -74,17 +74,19 @@ class TranslationRequest(BaseModel):
 
     @model_validator(mode="after")
     def _uri(self) -> "TranslationRequest":
+        # http(s) 만(javascript:·file: 을 저장했다가 나중에 서버가 가져가면 SSRF, 레드팀 L-3).
+        # 이미지를 서버가 가져오는 v1.1 OCR 에서는 자사 업로드 호스트만 허용한다.
         url = self.sourceImageUrl
         if url is not None:
             parts = urlsplit(url)
-            if not parts.scheme or not (parts.netloc or parts.path) or not url.isascii():
-                raise ValueError("sourceImageUrl 은 URI 여야 한다")
+            if parts.scheme not in ("http", "https") or not parts.netloc or not url.isascii():
+                raise ValueError("sourceImageUrl 은 http(s) URL 이어야 한다")
         return self
 
 
 class ActionUpdateRequest(BaseModel):
-    isChecked: bool | None = None  # noqa: N815
-    alertEnabled: bool | None = None  # noqa: N815
+    isChecked: StrictBool | None = None  # noqa: N815
+    alertEnabled: StrictBool | None = None  # noqa: N815
 
     @model_validator(mode="after")
     def _at_least_one(self) -> "ActionUpdateRequest":
