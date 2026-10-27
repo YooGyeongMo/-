@@ -141,11 +141,13 @@ def parse(payload: dict[str, Any], request: EngineRequest, model: str) -> Engine
             hint = item.get("dueHint")
             hint = _clip(hint, 100) if isinstance(hint, str) and hint.strip() else None
             actions.append(ActionDraft(action_text, hint, rules.due_at(hint, request.now)))
-        new_terms = tuple(
+        # 다듬은 뒤에 거른다: 공백뿐인 값("   ")은 다듬으면 빈 문자열이 된다(QA: POST·GET 불일치).
+        clipped = (
             NewTerm(_clip(t["termKo"], 100), _clip(t["plainKo"], 200), _clip(t["matchedText"], 100))
             for t in list(data.get("newTerms") or [])[:5]
             if isinstance(t, dict) and t.get("termKo") and t.get("plainKo") and t.get("matchedText")
         )
+        new_terms = tuple(t for t in clipped if t.term_ko and t.plain_ko and t.matched_text)
     except EngineError:
         raise
     except (KeyError, IndexError, TypeError, ValueError, AttributeError) as e:

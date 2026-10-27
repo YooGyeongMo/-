@@ -339,7 +339,9 @@ async def insert_translation(
     수 있어
     카드 표가 있으면 한 번만 확인한다.
     """
-    now = utcnow()
+    # MySQL DATETIME 은 초 단위라 마이크로초를 반올림한다
+    # → 응답(초 단위 버림)과 1초 어긋난다(QA #4).
+    now = utcnow().replace(microsecond=0)
     row = Translation(
         user_id=t.user_id,
         project_id=t.project_id,
@@ -416,9 +418,11 @@ async def insert_translation(
         actions=tuple(_action(a) for a in actions),
         terms=tuple(
             TermRow(
+                # GET(get_translation)과 같은 규칙: 저장한 값 그대로, 비면 원문 표기로.
                 term_id=sp.term_id,
-                term_ko=sp.term_ko,
-                plain_ko=sp.plain_ko,
+                term_ko=(sp.term_ko if sp.term_id is not None else sp.term_ko[:100])
+                or sp.matched_text[:100],
+                plain_ko=sp.plain_ko if sp.term_id is not None else sp.plain_ko[:200],
                 matched_text=sp.matched_text[:100],
                 start=sp.start,
                 end=sp.end,
@@ -816,30 +820,26 @@ class TermDetailRow:
 
 
 async def get_term(s: AsyncSession, term_id: int, user_id: int | None) -> TermDetailRow:
-    """용어 + 작성자(조인 1) · 조회수 +1(1) · 예문 5개(1) · [내 카드(1, v1.1~)] — 예전 5문 → 3문.
-
-    조회수는 DB 안에서 더하고(경합 안전) 응답 값은 메모리에서 +1 한다(다시 읽는 refresh 를 없앰).
-    """
+    """조회수 +1(1) · 용어 + 작성자(조인 1) · 예문 5개(1) · [내 카드(1, v1.1~)] — 예전 6문 → 3문."""
+    # 조회수를 **먼저** 올리고 읽는다: 같은 트랜잭션의 내 UPDATE 뒤 SELECT 는 방금 쓴 최신 값을 본다
+    # (먼저 읽고 +1 하면 동시에 본 두 요청이 같은 N+1 을 돌려준다, QA #5). 없는 용어면 0행 갱신.
+    await s.execute(
+        sa.update(Term)
+        .where(Term.id == term_id, Term.status == "APPROVED")
+        .values(view_count=Term.view_count + 1)
+        .execution_options(synchronize_session=False)
+    )
     head = (
         await s.execute(
             sa.select(Term, _users.c.nickname)
             .outerjoin(_users, _users.c.id == Term.created_by)
             .where(Term.id == term_id)
+            .execution_options(populate_existing=True)
         )
     ).first()
     if head is None or head[0].status != "APPROVED":
         raise DomainError(ErrorCode.TERM_NOT_FOUND, "용어를 찾을 수 없어요.")
     t, nickname = head
-    await s.execute(
-        sa.update(Term)
-        .where(Term.id == t.id)
-        .values(view_count=Term.view_count + 1)
-        .execution_options(synchronize_session=False)
-    )
-    t.view_count = (
-        t.view_count or 0
-    ) + 1  # 응답용. 세션 객체를 바꾸지만 flush 대상 아님(아래 expunge)
-    s.expunge(t)
     ex_rows = (
         await s.execute(
             sa.select(TermExample, _users.c.nickname)

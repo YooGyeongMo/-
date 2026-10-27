@@ -8,7 +8,7 @@ import SwiftUI
 /// 붙여넣기·캡처 고르기(캡처 OCR은 v1.1) → "받은 말을 그대로 붙여넣으세요" → 흰 입력 카드(파란 테두리)
 /// → 방향 칩·글자 수·해석하기 버튼. 해석이 끝나면 같은 자리에서 결과 시트로 바뀐다.
 public struct ComposeSheet: View {
-    @State private var model: ComposeViewModel
+    @ViewModelState private var model: ComposeViewModel
     let aiConsent: Bool
     let onResult: (Domain.Translation) -> Void
     let onNotice: (LocalizedStringKey) -> Void
@@ -22,7 +22,7 @@ public struct ComposeSheet: View {
         onResult: @escaping (Domain.Translation) -> Void,
         onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }
     ) {
-        _model = State(initialValue: ComposeViewModel(dependencies: dependencies))
+        _model = ViewModelState(wrappedValue: ComposeViewModel(dependencies: dependencies))
         self.aiConsent = aiConsent
         self.onResult = onResult
         self.onNotice = onNotice

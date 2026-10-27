@@ -10,10 +10,12 @@ class Settings(BaseSettings):
     contract_path: str = "../../contracts/openapi.yml"
     # 로컬 Compose 기본값. prod 는 sops 로 주입한다.
     database_url: str = "mysql+aiomysql://root:local@127.0.0.1:3306/mwonmal?charset=utf8mb4"
-    # 연결 풀(프로세스당). 블루·그린 5프로세스 × (10+5) = 75 < MySQL max_connections 151.
+    # 연결 풀(프로세스당). 블루·그린 5프로세스 × (10+10) = 100 < MySQL max_connections 151.
+    # 해석 요청은 AI 호출(최대 12초) 동안 연결을 쥔다(요청 = 트랜잭션 하나) → 여유를 크게, 대기도
+    # AI 타임아웃보다 길게. 연결을 AI 호출 전에 돌려주는 것은 #(v1.1 백로그, ADR-0021 §성능).
     db_pool_size: int = 10
-    db_max_overflow: int = 5
-    db_pool_timeout_sec: float = 3.0  # 풀이 차면 3초 기다린 뒤 실패(무한 대기로 요청이 쌓이지 않게)
+    db_max_overflow: int = 10
+    db_pool_timeout_sec: float = 15.0
     db_pool_recycle_sec: int = 1800  # MySQL wait_timeout(8h)·프록시 유휴 끊김보다 먼저 새 연결로
 
     # 우리 액세스 토큰 (RS256). 비어 있으면 local·test 만 임시 키.

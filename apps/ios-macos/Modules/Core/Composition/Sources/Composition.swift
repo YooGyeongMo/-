@@ -1,5 +1,6 @@
 import AuthFeature
 import Domain
+import FeatureKit
 import HomeFeature
 import MwonmalUI
 import Routing
@@ -16,7 +17,8 @@ public enum CompositionModule {
 /// wide(iPad·Mac)는 v1.3·v1.4에서 AdaptiveRoot로(ADR-0006).
 struct AppRootView: View {
     let session: AppSession
-    @State private var router = AppRouter()
+    /// `@State var router = AppRouter()`는 이 뷰가 다시 만들어질 때마다 라우터를 새로 만들고 버린다 → 한 번만.
+    @ViewModelState private var router = AppRouter()
     @State private var toast: LocalizedStringKey?
     @State private var toastTask: Task<Void, Never>?
     @State private var aiConsent = false
@@ -194,10 +196,11 @@ struct ReviewComingSoonView: View {
 
 /// 세션 상태에 따라 로그인 화면과 탭 루트를 고른다.
 public struct SessionRootView: View {
-    @State private var session: AppSession
+    @ViewModelState private var session: AppSession
 
-    public init(session: AppSession = .live()) {
-        _session = State(initialValue: session)
+    /// `.live()`(Keychain·URLSession·API 조립)는 앱 수명에 한 번만 돈다 — App 의 body 가 다시 불려도.
+    public init(session: @autoclosure @escaping () -> AppSession = .live()) {
+        _session = ViewModelState(wrappedValue: session())
     }
 
     public var body: some View {

@@ -68,7 +68,7 @@ def test_head_plus_staged_equals_contract(tmp_path: Path, backend: str) -> None:
         with engine.begin() as conn:
             ops = Operations(MigrationContext.configure(conn))
             for m in modules:
-                m.op = ops  # 초안은 `from alembic import op` 를 쓴다 → 이 연결로 묶는다
+                vars(m)["op"] = ops  # 초안은 `from alembic import op` 를 쓴다 → 이 연결로 묶는다
                 m.upgrade()
         with engine.connect() as conn:
             diff = compare_metadata(MigrationContext.configure(conn), metadata)
@@ -78,7 +78,7 @@ def test_head_plus_staged_equals_contract(tmp_path: Path, backend: str) -> None:
         with engine.begin() as conn:
             ops = Operations(MigrationContext.configure(conn))
             for m in reversed(modules):
-                m.op = ops
+                vars(m)["op"] = ops
                 m.downgrade()
         with engine.connect() as conn:
             assert set(sa.inspect(conn).get_table_names()) - {"alembic_version"} == ACTIVE_TABLES

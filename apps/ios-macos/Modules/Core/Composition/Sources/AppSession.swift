@@ -82,8 +82,7 @@ public final class AppSession {
         listenForUnauthorized()
         return Task {
             if resetOnLaunch {
-                try? await signOutUseCase()
-                await consent.setGranted(false)
+                await endSession(reason: nil).value
             }
             state = await restoreUseCase()
         }
@@ -146,12 +145,22 @@ public final class AppSession {
     /// 로그아웃: 토큰과 AI 동의를 지운다(#25 "로그아웃 시 초기화").
     @discardableResult
     public func signOut() -> Task<Void, Never> {
-        // 상태를 먼저 바꾼다: 토큰을 지우는 사이 화면이 보낸 요청의 401 이 "로그인이 풀렸어요"로 보이지 않게.
+        endSession(reason: nil)
+    }
+
+    /// 세션을 끝내는 **유일한 곳**(직접 로그아웃·401·시작 시 초기화가 모두 여기로 온다).
+    /// 지울 것이 늘면 여기 한 줄만 더한다. 화면 상태(라우터·시트·화면 모델)는 `state`가 `.signedOut`이 되면
+    /// `AppRootView`가 트리에서 빠지면서 함께 사라진다(뷰 수명 = 로그인 수명).
+    ///
+    /// 순서: 상태를 **먼저** 바꾼다. 토큰을 지우는 사이 화면이 보낸 요청의 401이 "로그인이 풀렸어요"로
+    /// 다시 들어오지 않게(아래 `handleUnauthorized`의 guard에서 멈춘다).
+    @discardableResult
+    private func endSession(reason: DomainError?) -> Task<Void, Never> {
         state = .signedOut
-        lastError = nil
+        lastError = reason
         return Task {
-            try? await signOutUseCase()
-            await consent.setGranted(false)
+            try? await signOutUseCase() // Keychain 토큰
+            await consent.setGranted(false) // AI 외부 전송 동의(#25)
         }
     }
 
@@ -171,10 +180,7 @@ public final class AppSession {
         case .signedIn, .unverified: break
         default: return
         }
-        state = .signedOut // 먼저 바꿔 동시에 온 401 은 위 guard 에서 멈춘다
-        lastError = .unauthorized
-        try? await signOutUseCase()
-        await consent.setGranted(false) // #25: 로그인이 풀리면 AI 동의도 꺼진다
+        await endSession(reason: .unauthorized).value
     }
 }
 
