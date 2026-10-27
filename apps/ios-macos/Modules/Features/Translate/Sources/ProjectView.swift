@@ -273,7 +273,7 @@ struct TranslationCard: View {
     /// Figma "9월 17일 (수) · 10:00".
     static func dateText(_ date: Date) -> String {
         let parts = Calendar.current.dateComponents([.month, .day], from: date)
-        let weekday = date.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: "ko_KR")))
+        let weekday = date.formatted(.dateTime.weekday(.abbreviated))
         return fmt("translate.card.date", parts.month ?? 0, parts.day ?? 0, weekday) + " · \(date.mwClock)"
     }
 }

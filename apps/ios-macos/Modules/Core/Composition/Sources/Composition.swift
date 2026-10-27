@@ -63,7 +63,12 @@ struct AppRootView: View {
             }
         }
         .ignoresSafeArea(.keyboard)
-        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { inset in
+            // 홈 인디케이터(0~34)만 쓴다. 키보드가 올라와 커진 값은 무시한다(QA 2차 R2: 탭 바가 밀리지 않게).
+            if inset <= 60 {
+                bottomInset = inset
+            }
+        }
         .environment(router)
         .sheet(item: Binding(get: { router.sheet }, set: { router.sheet = $0 }), onDismiss: { prefetched = nil }, content: { sheet in
             sheetContent(sheet)
@@ -73,6 +78,8 @@ struct AppRootView: View {
         })
         .task { aiConsent = await session.consent.isGranted() }
         .onChange(of: router.sheet) { _, _ in Task { aiConsent = await session.consent.isGranted() } }
+        // 설정은 붙여넣기 위에 겹쳐 뜬다 → 닫힐 때도 동의를 다시 읽는다(QA 2차 R1).
+        .onChange(of: router.sheetOverSheet) { _, _ in Task { aiConsent = await session.consent.isGranted() } }
         .onChange(of: router.dataVersion) { _, _ in Task { await session.reloadProfile() } }
     }
 
