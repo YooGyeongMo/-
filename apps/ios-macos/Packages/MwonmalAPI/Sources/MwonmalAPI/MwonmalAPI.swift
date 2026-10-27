@@ -8,7 +8,7 @@ public enum MwonmalAPIModule {
     public static let name = "MwonmalAPI"
 }
 
-/// 생성된 `Client`를 미들웨어 3개(D-12)와 KST 날짜 변환(D-13)으로 조립한다.
+/// 생성된 `Client`를 미들웨어(D-12 3개 + AI 동의 헤더)와 KST 날짜 변환(D-13)으로 조립한다.
 public enum MwonmalAPIClientFactory {
     /// - Parameters:
     ///   - serverURL: `…/api`까지 포함한 기준 주소.
@@ -28,6 +28,7 @@ public enum MwonmalAPIClientFactory {
                 ErrorMiddleware(),
                 RetryMiddleware(),
                 AuthMiddleware(accessToken: accessToken, unauthorized: unauthorized),
+                AIConsentMiddleware(),
             ]
         )
     }

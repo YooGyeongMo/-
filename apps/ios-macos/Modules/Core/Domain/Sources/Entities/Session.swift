@@ -26,12 +26,24 @@ public struct UserProfile: Sendable, Equatable, Identifiable {
     public let email: String?
     /// 온보딩 전이면 nil.
     public let jobGroup: String?
+    /// 판교 등급 코드(OUTSIDER…LOCAL). 진단 전이면 nil → 화면은 Lv1로 본다.
+    public let levelCode: String?
+    public let bestScore: Int
+    public let currentStreak: Int
+    public let currentProjectId: Int64?
 
-    public init(id: Int64, nickname: String, email: String?, jobGroup: String?) {
+    public init(
+        id: Int64, nickname: String, email: String?, jobGroup: String?,
+        levelCode: String? = nil, bestScore: Int = 0, currentStreak: Int = 0, currentProjectId: Int64? = nil
+    ) {
         self.id = id
         self.nickname = nickname
         self.email = email
         self.jobGroup = jobGroup
+        self.levelCode = levelCode
+        self.bestScore = bestScore
+        self.currentStreak = currentStreak
+        self.currentProjectId = currentProjectId
     }
 }
 

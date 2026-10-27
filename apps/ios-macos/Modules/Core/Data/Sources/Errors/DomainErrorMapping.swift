@@ -24,13 +24,21 @@ enum DomainErrorMapping {
             return offlineCodes.contains(url.code) ? .offline : .unknown
         }
         if let server = MwonmalServerError.unwrap(cause) {
-            switch server.code {
-            case "OAUTH_CODE_INVALID": return .signInFailed(message: server.message)
-            case "EMAIL_ALREADY_REGISTERED": return .emailAlreadyRegistered(message: server.message)
-            case "UNAUTHORIZED": return .unauthorized
-            default: return .server(code: server.code, message: server.message)
-            }
+            return map(server)
         }
         return .unknown
+    }
+
+    static func map(_ server: MwonmalServerError) -> DomainError {
+        switch server.code {
+        case "OAUTH_CODE_INVALID": .signInFailed(message: server.message)
+        case "EMAIL_ALREADY_REGISTERED": .emailAlreadyRegistered(message: server.message)
+        case "UNAUTHORIZED": .unauthorized
+        case "AI_UNAVAILABLE": .aiUnavailable(retryAfter: server.retryAfterSeconds, message: server.message)
+        case "INVALID_INPUT": .invalidInput(message: server.message)
+        case "NOT_OWNER", "FORBIDDEN", "NOT_FOUND": .notFound
+        case let code where code.hasSuffix("_NOT_FOUND"): .notFound
+        default: .server(code: server.code, message: server.message)
+        }
     }
 }

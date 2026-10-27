@@ -50,4 +50,44 @@ struct AppSessionTests {
         #expect(app.state == .signedOut)
         #expect(await store.token == nil)
     }
+
+    @Test("직접 로그아웃은 세션 만료 문구를 남기지 않고 AI 동의를 끈다") func signOutClearsErrorAndConsent() async {
+        let consent = InMemoryAIConsentStore(granted: true)
+        let store = InMemoryTokenStore(token: "t")
+        let repo = FakeAuthRepository()
+        let app = AppSession(
+            makeSignIn: { SignInUseCase(codeProvider: $0, repository: repo, tokenStore: store) },
+            restore: RestoreSessionUseCase(repository: repo, tokenStore: store),
+            signOut: SignOutUseCase(tokenStore: store),
+            consent: consent
+        )
+        await app.start().value
+        await app.signOut().value
+        #expect(app.state == .signedOut)
+        #expect(app.lastError == nil)
+        #expect(await consent.granted == false)
+    }
+
+    @Test("401 신호면 로그아웃 + 만료 안내 + AI 동의 끔(#25)") func unauthorizedClearsConsent() async throws {
+        let consent = InMemoryAIConsentStore(granted: true)
+        let store = InMemoryTokenStore(token: "t")
+        let repo = FakeAuthRepository()
+        let (events, continuation) = AsyncStream.makeStream(of: Void.self)
+        let app = AppSession(
+            makeSignIn: { SignInUseCase(codeProvider: $0, repository: repo, tokenStore: store) },
+            restore: RestoreSessionUseCase(repository: repo, tokenStore: store),
+            signOut: SignOutUseCase(tokenStore: store),
+            unauthorizedEvents: events,
+            consent: consent
+        )
+        await app.start().value
+        #expect(app.state == .signedIn(.sample))
+        continuation.yield()
+        for _ in 0 ..< 50 where app.state != .signedOut {
+            try await Task.sleep(for: .milliseconds(10))
+        }
+        #expect(app.state == .signedOut)
+        #expect(app.lastError == .unauthorized)
+        #expect(await consent.granted == false)
+    }
 }

@@ -11,6 +11,12 @@ public enum DomainError: Error, Sendable, Equatable {
     case unauthorized
     /// 네트워크에 닿지 못함.
     case offline
+    /// 해석 엔진이 쉬는 중(503 AI_UNAVAILABLE). `retryAfter`초 뒤 다시(#27).
+    case aiUnavailable(retryAfter: Int?, message: String?)
+    /// 입력 확인(400 INVALID_INPUT). 서버 문구를 그대로 보여 준다.
+    case invalidInput(message: String?)
+    /// 없거나 내 것이 아님(404 *_NOT_FOUND, 403 NOT_OWNER).
+    case notFound
     /// 그 밖의 서버 에러.
     case server(code: String, message: String?)
     case unknown

@@ -30,4 +30,8 @@ public final class APIEnvironment: Sendable {
     public func authRepository() -> any AuthRepository {
         RemoteAuthRepository(client: client)
     }
+
+    public func translationRepository() -> any TranslationRepository {
+        RemoteTranslationRepository(client: client)
+    }
 }

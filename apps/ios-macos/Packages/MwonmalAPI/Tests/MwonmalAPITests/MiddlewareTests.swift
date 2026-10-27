@@ -195,3 +195,29 @@ struct APIErrorCauseTests {
         }
     }
 }
+
+struct AIConsentMiddlewareTests {
+    static let translationJSON = #"{"translationId":1,"sourceText":"a","resultText":"a","jargonCount":0,"actionItems":[],"#
+        + #""detectedTerms":[],"aiModel":"none/dictionary#p1","createdAt":"2026-10-27T10:00:00"}"#
+
+    private func translate(_ client: Client) async throws {
+        _ = try await client.createTranslation(body: .json(.init(sourceText: "a", direction: .jargonToPlain))).created
+    }
+
+    @Test("동의하지 않으면 헤더가 없다(기본)") func noHeaderByDefault() async throws {
+        let transport = FakeTransport([.init(status: .created, body: Self.translationJSON)])
+        try await translate(makeClient(transport))
+        #expect(transport.requests[0].0.headerFields[AIConsent.headerName] == nil)
+    }
+
+    @Test("동의하면 해석 요청에만 1을 붙인다") func headerOnlyOnTranslate() async throws {
+        let transport = FakeTransport([.init(status: .created, body: Self.translationJSON), .init(status: .ok, body: meJSON)])
+        let client = makeClient(transport)
+        try await AIConsent.$granted.withValue(true) {
+            try await translate(client)
+            _ = try await client.getMe()
+        }
+        #expect(transport.requests[0].0.headerFields[AIConsent.headerName] == "1")
+        #expect(transport.requests[1].0.headerFields[AIConsent.headerName] == nil)
+    }
+}

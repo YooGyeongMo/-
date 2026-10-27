@@ -144,7 +144,7 @@ public func featureModule(
                 deploymentTargets: .iOS("17.0"),
                 infoPlist: .extendingDefault(with: ["UILaunchScreen": [:]]),
                 sources: ["\(root)/Example/**"],
-                dependencies: [.target(name: target), .target(name: "DomainTesting")],
+                dependencies: [.target(name: target), .target(name: "DomainTesting"), .target(name: "Routing"), .target(name: "MwonmalUI")],
                 metadata: .metadata(tags: tags + ["kind:example"])
             )
         )
