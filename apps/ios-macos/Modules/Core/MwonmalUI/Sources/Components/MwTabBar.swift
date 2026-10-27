@@ -23,7 +23,7 @@ public struct MwTabBar<Tab: Hashable>: View {
 
     let items: [Item]
     @Binding var selection: Tab
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init(items: [Item], selection: Binding<Tab>) {
@@ -42,10 +42,10 @@ public struct MwTabBar<Tab: Hashable>: View {
                 tabButton(item)
             }
         }
-        .padding(.horizontal, 6 * s)
-        .frame(height: 64 * s)
+        .padding(.horizontal, 6 * scale)
+        .frame(minHeight: 64 * scale)
         .background {
-            let shape = RoundedRectangle(cornerRadius: 32 * s, style: .circular)
+            let shape = RoundedRectangle(cornerRadius: 32 * scale, style: .circular)
             ZStack {
                 if reduceTransparency {
                     shape.fill(MwColor.surface)
@@ -53,11 +53,11 @@ public struct MwTabBar<Tab: Hashable>: View {
                     shape.fill(.ultraThinMaterial)
                     shape.fill(MwColor.glassFillThin)
                 }
-                shape.strokeBorder(Color.white.opacity(0.9), lineWidth: 1)
+                shape.strokeBorder(MwColor.glassBorder, lineWidth: 1)
             }
-            .mwGlassShadow(s, y: 12, blur: 32, opacity: 0.16)
+            .mwGlassShadow(scale, y: 12, blur: 32, opacity: 0.16)
         }
-        .frame(width: 353 * s)
+        .frame(width: 353 * scale)
     }
 
     private func tabButton(_ item: Item) -> some View {
@@ -66,29 +66,29 @@ public struct MwTabBar<Tab: Hashable>: View {
         return Button {
             selection = item.tab
         } label: {
-            VStack(spacing: 3 * s) {
+            VStack(spacing: 3 * scale) {
                 MwIconView(item.icon, color: color)
                 item.title
-                    .font(MwFont.pretendard(.semiBold, size: 11 * s))
+                    .font(MwFont.pretendard(.semiBold, size: 11 * scale))
                     .foregroundStyle(color)
                     .lineLimit(1)
                     .minimumScaleFactor(0.8)
             }
-            .frame(maxWidth: .infinity, minHeight: 52 * s)
+            .frame(maxWidth: .infinity, minHeight: 52 * scale)
             .background {
                 if selected {
-                    RoundedRectangle(cornerRadius: 26 * s, style: .circular).fill(MwColor.tabSelected)
+                    RoundedRectangle(cornerRadius: 26 * scale, style: .circular).fill(MwColor.tabSelected)
                 }
             }
             .overlay(alignment: .topLeading) {
                 if let badge = item.badge, badge > 0 {
                     Text(verbatim: "\(min(badge, 99))")
-                        .font(MwFont.pretendard(.bold, size: 11 * s))
+                        .font(MwFont.pretendard(.bold, size: 11 * scale))
                         .foregroundStyle(Color.white)
-                        .padding(.horizontal, 5 * s)
-                        .frame(minWidth: 18 * s, minHeight: 18 * s)
+                        .padding(.horizontal, 5 * scale)
+                        .frame(minWidth: 18 * scale, minHeight: 18 * scale)
                         .background(Capsule().fill(MwColor.badgeFill))
-                        .offset(x: 49.38 * s, y: 3 * s)
+                        .offset(x: 49.38 * scale, y: 3 * scale)
                         .accessibilityHidden(true)
                 }
             }

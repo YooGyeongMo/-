@@ -44,7 +44,7 @@ public final class ComposeViewModel {
     public var text = ""
     public private(set) var state: State = .editing
     private let translate: TranslateUseCase
-    private var task: Task<Translation?, Never>?
+    private var task: Task<Domain.Translation?, Never>?
 
     public init(dependencies: TranslateDependencies) {
         translate = TranslateUseCase(repository: dependencies.repository, consent: dependencies.consent)
@@ -60,16 +60,18 @@ public final class ComposeViewModel {
     }
 
     /// 해석을 보낸다. 성공하면 결과를, 실패·취소면 nil(실패 이유는 `state`).
-    public func submit() async -> Translation? {
-        task?.cancel()
+    public func submit() async -> Domain.Translation? {
+        guard state != .translating else { return nil } // 두 번 누름 → 한 번만(QA M4)
         let text = text
         state = .translating
-        let task = Task { [translate] () -> Translation? in
+        let task = Task { [translate] () -> Domain.Translation? in
             do {
                 return try await translate(text)
             } catch let error as DomainError {
                 await self.fail(error)
                 return nil
+            } catch is CancellationError {
+                return nil // 취소는 cancel() 이 상태를 돌려놓았다
             } catch {
                 await self.fail(.unknown)
                 return nil
@@ -100,7 +102,7 @@ public final class ComposeViewModel {
     private func fail(_ error: DomainError) {
         switch error {
         case .cancelled:
-            state = .editing
+            break // 취소는 cancel() 이 이미 상태를 돌려놓았다
         case .invalidInput:
             state = .failed(length > TranslateUseCase.maxLength ? .tooLong : .empty)
         case .offline:
@@ -119,7 +121,7 @@ public final class ComposeViewModel {
 
 @MainActor @Observable
 public final class ResultViewModel {
-    public private(set) var translation: Phase<Translation> = .idle
+    public private(set) var translation: Phase<Domain.Translation> = .idle
     public var notice: LocalizedStringKey?
     private let repository: any TranslationRepository
     private let toggleUseCase: ToggleActionUseCase
@@ -127,7 +129,7 @@ public final class ResultViewModel {
     /// 체크가 바뀌면 홈·목록이 다시 불러오도록 알린다.
     var onChange: () -> Void = {}
 
-    public init(translationId: Int64, dependencies: TranslateDependencies, prefetched: Translation? = nil) {
+    public init(translationId: Int64, dependencies: TranslateDependencies, prefetched: Domain.Translation? = nil) {
         self.translationId = translationId
         repository = dependencies.repository
         toggleUseCase = ToggleActionUseCase(repository: dependencies.repository)
@@ -151,11 +153,11 @@ public final class ResultViewModel {
     }
 
     public func toggle(_ action: ActionItem) async {
-        guard var t = translation.value, let i = t.actions.firstIndex(where: { $0.id == action.id }) else { return }
-        t.actions[i].isChecked.toggle()
-        translation = .loaded(t)
+        guard var item = translation.value, let i = item.actions.firstIndex(where: { $0.id == action.id }) else { return }
+        item.actions[i].isChecked.toggle()
+        translation = .loaded(item)
         do {
-            let saved = try await toggleUseCase(translationId: t.id, action: action)
+            let saved = try await toggleUseCase(translationId: item.id, action: action)
             guard var now = translation.value, let j = now.actions.firstIndex(where: { $0.id == action.id }) else { return }
             now.actions[j] = saved
             translation = .loaded(now)
@@ -196,6 +198,7 @@ public final class ProjectViewModel {
     public private(set) var openActionTotal = 0
     private var page = 1
     private var hasMore = false
+    private var isLoadingMore = false
     private let repository: any TranslationRepository
     private let toggleUseCase: ToggleActionUseCase
     public var notice: LocalizedStringKey?
@@ -225,21 +228,23 @@ public final class ProjectViewModel {
         } catch {
             translations = .failed(code: "UNKNOWN")
         }
-        if let a = try? await actions {
-            openActions = .loaded(a.items)
-            openActionTotal = a.totalElements
+        if let page = try? await actions {
+            openActions = .loaded(page.items)
+            openActionTotal = page.totalElements
         } else if openActions.value == nil {
             openActions = .failed(code: "UNKNOWN")
         }
-        project = (try? await projects)?.first
+        project = await (try? projects)?.first
     }
 
     public func loadMoreIfNeeded(current item: TranslationSummary) async {
-        guard hasMore, let list = translations.value, item.id == list.last?.id else { return }
+        guard hasMore, !isLoadingMore, let list = translations.value, item.id == list.last?.id else { return }
+        isLoadingMore = true
+        defer { isLoadingMore = false }
         do {
             let next = try await repository.translations(projectId: nil, page: page + 1, size: 20)
-            translations = .loaded(list + next.items.filter { n in !list.contains { $0.id == n.id } })
-            page += 1
+            translations = .loaded(list + next.items.filter { newItem in !list.contains { $0.id == newItem.id } })
+            page = next.page // 응답이 알려 준 페이지(QA M5)
             hasMore = next.hasMore
         } catch {
             hasMore = false
@@ -263,6 +268,6 @@ public final class ProjectViewModel {
 }
 
 /// 카탈로그 문구 + 값(키는 점 표기만 쓴다 → 값은 %lld·%@ 자리표시자로 넣는다, check-xcstrings).
-func L(_ key: String, _ args: CVarArg...) -> String {
+func fmt(_ key: String, _ args: CVarArg...) -> String {
     String(format: String(localized: String.LocalizationValue(key), bundle: .module), arguments: args)
 }

@@ -108,7 +108,12 @@ public final class AppSession {
 
     /// 사용자 정보(등급·연속·현재 프로젝트)를 다시 읽는다. 실패하면 그대로 둔다.
     public func reloadProfile() async {
-        guard case .signedIn = state, let profile = try? await refreshProfile() else { return }
+        // 오프라인으로 시작(unverified)했어도 다시 닿으면 회복한다.
+        switch state {
+        case .signedIn, .unverified: break
+        default: return
+        }
+        guard let profile = try? await refreshProfile() else { return }
         state = .signedIn(profile)
     }
 
@@ -141,10 +146,12 @@ public final class AppSession {
     /// 로그아웃: 토큰과 AI 동의를 지운다(#25 "로그아웃 시 초기화").
     @discardableResult
     public func signOut() -> Task<Void, Never> {
-        Task {
+        // 상태를 먼저 바꾼다: 토큰을 지우는 사이 화면이 보낸 요청의 401 이 "로그인이 풀렸어요"로 보이지 않게.
+        state = .signedOut
+        lastError = nil
+        return Task {
             try? await signOutUseCase()
             await consent.setGranted(false)
-            state = .signedOut
         }
     }
 
@@ -159,7 +166,13 @@ public final class AppSession {
     }
 
     private func handleUnauthorized() async {
+        // 이미 로그아웃 중이면(직접 로그아웃) 무시한다.
+        switch state {
+        case .signedIn, .unverified: break
+        default: return
+        }
         try? await signOutUseCase()
+        await consent.setGranted(false) // #25: 로그인이 풀리면 AI 동의도 꺼진다
         lastError = .unauthorized
         state = .signedOut
     }
@@ -191,7 +204,12 @@ struct ProvidedCode: OAuthCodeProviding {
 /// 저장소를 넣지 않은 테스트용 기본값. 부르면 항상 실패한다.
 public struct UnavailableTranslationRepository: TranslationRepository {
     public init() {}
-    public func translate(_: String, direction _: TranslationDirection, projectId _: Int64?, aiConsent _: Bool) async throws -> Translation {
+    public func translate(
+        _: String,
+        direction _: TranslationDirection,
+        projectId _: Int64?,
+        aiConsent _: Bool
+    ) async throws -> Domain.Translation {
         throw DomainError.unknown
     }
 
@@ -199,7 +217,7 @@ public struct UnavailableTranslationRepository: TranslationRepository {
         throw DomainError.unknown
     }
 
-    public func translation(id _: Int64) async throws -> Translation {
+    public func translation(id _: Int64) async throws -> Domain.Translation {
         throw DomainError.unknown
     }
 

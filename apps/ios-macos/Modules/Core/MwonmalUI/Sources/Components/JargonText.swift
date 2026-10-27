@@ -50,8 +50,12 @@ public struct JargonText: View {
             .accessibilityLabel(Text(verbatim: text))
             .accessibilityHint(Text(verbatim: highlights.map(\.meaning).joined(separator: ", ")))
             .accessibilityActions {
-                ForEach(highlights.filter { $0.termId != nil }, id: \.self) { h in
-                    Button(h.meaning) { if let id = h.termId { onTerm(id) } }
+                ForEach(highlights.filter { $0.termId != nil }, id: \.self) { item in
+                    Button(item.meaning) {
+                        if let id = item.termId {
+                            onTerm(id)
+                        }
+                    }
                 }
             }
     }
@@ -62,16 +66,16 @@ public struct JargonText: View {
         let scalars = text.unicodeScalars
         let count = scalars.count
         var lastEnd = 0
-        for h in highlights.sorted(by: { $0.start < $1.start }) {
-            guard h.start >= lastEnd, h.start < h.end, h.end <= count else { continue }
-            let lower = scalars.index(scalars.startIndex, offsetBy: h.start)
-            let upper = scalars.index(scalars.startIndex, offsetBy: h.end)
+        for item in highlights.sorted(by: { $0.start < $1.start }) {
+            guard item.start >= lastEnd, item.start < item.end, item.end <= count else { continue }
+            let lower = scalars.index(scalars.startIndex, offsetBy: item.start)
+            let upper = scalars.index(scalars.startIndex, offsetBy: item.end)
             guard let range = Range(lower ..< upper, in: result) else { continue }
             result[range].backgroundColor = MwColor.jargonHighlight
-            if let id = h.termId {
+            if let id = item.termId {
                 result[range].link = URL(string: "\(scheme)://\(id)")
             }
-            lastEnd = h.end
+            lastEnd = item.end
         }
         return result
     }

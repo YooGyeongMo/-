@@ -3,6 +3,9 @@ excluded: [apps/ios-macos/Derived, apps/ios-macos/**/Generated, apps/ios-macos/P
 disabled_rules: [trailing_comma, todo]
 opt_in_rules: [empty_count, explicit_init, first_where, sorted_imports, unowned_variable_capture]
 line_length: { warning: 140, error: 180 }
+# 짧은 이름은 관례적인 것만 허용(반복 첨자·좌표·id·Toggle의 on·탭 이름 MY). 그 밖은 3글자 이상.
+identifier_name:
+  excluded: [i, j, k, x, y, id, on, my]
 custom_rules:
   # presentation_cross_import(흐름 간 참조 금지)는 ADR-0016 기능 모듈로 컴파일러가 막으므로 제거.
   feature_forbidden_import:

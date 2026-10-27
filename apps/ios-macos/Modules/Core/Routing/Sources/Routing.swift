@@ -90,9 +90,14 @@ public final class AppRouter: AppNavigating {
         paths[selectedTab] = []
     }
 
-    /// 시트가 이미 떠 있으면 용어 시트는 그 위에, 나머지는 바꿔 띄운다(붙여넣기 → 결과).
+    /// 시트가 이미 떠 있으면 용어·설정 시트는 그 위에(아래 시트의 입력을 잃지 않게), 나머지는 바꿔 띄운다
+    /// (붙여넣기 → 결과).
     public func present(_ sheet: AppSheet) {
-        if case .term = sheet, self.sheet != nil {
+        let stacks: Bool = switch sheet {
+        case .term, .settings: self.sheet != nil
+        default: false
+        }
+        if stacks {
             sheetOverSheet = sheet
             return
         }

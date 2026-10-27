@@ -60,6 +60,14 @@ struct AppRouterTests {
         #expect(router.sheet == nil)
     }
 
+    @Test("붙여넣기 위에서 설정을 열면 붙여넣기는 그대로 남는다") func settingsOverCompose() {
+        let router = AppRouter()
+        router.present(.compose)
+        router.present(.settings)
+        #expect(router.sheet == .compose)
+        #expect(router.sheetOverSheet == .settings)
+    }
+
     @Test("reset은 시트·경로·탭을 처음으로") func resetClearsAll() {
         let router = AppRouter()
         router.select(.project)

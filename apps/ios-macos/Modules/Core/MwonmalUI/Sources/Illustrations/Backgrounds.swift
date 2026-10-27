@@ -31,7 +31,7 @@ public struct MwSceneBackground: View {
     }
 
     let palette: Palette
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
     @Environment(\.colorScheme) private var colorScheme
 
     public init(_ palette: Palette) {
@@ -39,10 +39,16 @@ public struct MwSceneBackground: View {
     }
 
     /// 물결 3겹: (이름, 높이, 화면 아래에서 위 끝까지 거리 = 852 − Figma top).
-    static let waves: [(name: String, height: CGFloat, top: CGFloat)] = [
-        ("SceneWave1", 195, 852 - 677),
-        ("SceneWave2", 154.9, 852 - 717.1),
-        ("SceneWave3", 120.2, 852 - 751.8),
+    struct Wave {
+        let name: String
+        let height: CGFloat
+        let top: CGFloat
+    }
+
+    static let waves: [Wave] = [
+        Wave(name: "SceneWave1", height: 195, top: 852 - 677),
+        Wave(name: "SceneWave2", height: 154.9, top: 852 - 717.1),
+        Wave(name: "SceneWave3", height: 120.2, top: 852 - 751.8),
     ]
 
     public var body: some View {
@@ -62,15 +68,15 @@ public struct MwSceneBackground: View {
                 // 원 108×108: 위 42(4.93%), 오른쪽 −13(−3.31%)
                 Circle()
                     .fill(palette.circle.opacity(0.55))
-                    .frame(width: 108 * s, height: 108 * s)
-                    .offset(x: size.width - (108 - 13) * s, y: 42 * s)
+                    .frame(width: 108 * scale, height: 108 * scale)
+                    .offset(x: size.width - (108 - 13) * scale, y: 42 * scale)
                 ForEach(Array(Self.waves.enumerated()), id: \.offset) { index, wave in
                     let (color, opacity) = palette.waves[index]
                     Image(wave.name, bundle: .module)
                         .resizable()
                         .foregroundStyle(color.opacity(opacity))
-                        .frame(width: size.width + 40 * s, height: wave.height * s)
-                        .offset(x: -20 * s, y: size.height - wave.top * s)
+                        .frame(width: size.width + 40 * scale, height: wave.height * scale)
+                        .offset(x: -20 * scale, y: size.height - wave.top * scale)
                 }
             }
             .frame(width: size.width, height: size.height, alignment: .topLeading)
@@ -83,14 +89,14 @@ public struct MwSceneBackground: View {
 
 /// 홈 히어로(Figma 51:1274, 393×300): 노란 하늘·해·물결·자전거 탄 사람·걷는 두 사람. 너비에 맞춰 같은 비율로.
 public struct MwHomeHero: View {
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init() {}
 
     public var body: some View {
         Image("HomeHero", bundle: .module)
             .resizable()
-            .frame(width: 393 * s, height: 300 * s)
+            .frame(width: 393 * scale, height: 300 * scale)
             .frame(maxWidth: .infinity)
             .accessibilityHidden(true)
     }
@@ -98,15 +104,15 @@ public struct MwHomeHero: View {
 
 /// MY 프로필 그림(Figma 51:2748, 64×64, 모서리 22).
 public struct MwProfileAvatar: View {
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init() {}
 
     public var body: some View {
         Image("ProfileAvatar", bundle: .module)
             .resizable()
-            .frame(width: 64 * s, height: 64 * s)
-            .clipShape(RoundedRectangle(cornerRadius: 22 * s, style: .circular))
+            .frame(width: 64 * scale, height: 64 * scale)
+            .clipShape(RoundedRectangle(cornerRadius: 22 * scale, style: .circular))
             .accessibilityHidden(true)
     }
 }

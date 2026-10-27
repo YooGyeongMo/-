@@ -13,7 +13,11 @@ public struct RemoteTranslationRepository: TranslationRepository {
 
     public func translate(_ text: String, direction: TranslationDirection, projectId: Int64?, aiConsent: Bool) async throws -> Translation {
         do {
-            let request = Components.Schemas.TranslationRequest(projectId: projectId, sourceText: text, direction: Self.direction(direction))
+            let request = Components.Schemas.TranslationRequest(
+                projectId: projectId,
+                sourceText: text,
+                direction: Self.direction(direction)
+            )
             let output = try await AIConsent.$granted.withValue(aiConsent) {
                 try await client.createTranslation(body: .json(request))
             }
@@ -74,15 +78,15 @@ public struct RemoteTranslationRepository: TranslationRepository {
     public func term(id: Int64) async throws -> TermDetail {
         do {
             let body = try await client.getTerm(path: .init(termId: id)).ok.body.json
-            guard let termId = body.value1.termId, let ko = body.value1.termKo else { throw Self.invalid }
+            guard let termId = body.value1.termId, let termName = body.value1.termKo else { throw Self.invalid }
             return TermDetail(
                 id: termId,
-                termKo: ko,
+                termKo: termName,
                 originEn: body.value1.originEn.flatMap { $0.isEmpty ? nil : $0 },
                 plainKo: body.value1.plainKo ?? "",
                 meaning: body.value2.meaning ?? "",
-                examples: (body.value2.examples ?? []).compactMap { e in
-                    guard let jargon = e.sentenceJargon, let plain = e.sentencePlain else { return nil }
+                examples: (body.value2.examples ?? []).compactMap { example in
+                    guard let jargon = example.sentenceJargon, let plain = example.sentencePlain else { return nil }
                     return TermExample(jargon: jargon, plain: plain)
                 }
             )
@@ -94,13 +98,13 @@ public struct RemoteTranslationRepository: TranslationRepository {
     public func projects() async throws -> [ProjectSummary] {
         do {
             let body = try await client.getProjects(query: .init(page: 1, size: 100)).ok.body.json
-            return (body.value2.content ?? []).compactMap { p in
-                guard let id = p.projectId, let name = p.name else { return nil }
+            return (body.value2.content ?? []).compactMap { proj in
+                guard let id = proj.projectId, let name = proj.name else { return nil }
                 return ProjectSummary(
-                    id: id, name: name, description: p.description ?? "",
-                    translationCount: p.translationCount ?? 0, openActionCount: p.openActionCount ?? 0,
-                    meetingCount: p.meetingCount ?? 0, unknownTermCount: p.unknownTermCount ?? 0,
-                    isDefault: p.isDefault ?? false
+                    id: id, name: name, description: proj.description ?? "",
+                    translationCount: proj.translationCount ?? 0, openActionCount: proj.openActionCount ?? 0,
+                    meetingCount: proj.meetingCount ?? 0, unknownTermCount: proj.unknownTermCount ?? 0,
+                    isDefault: proj.isDefault ?? false
                 )
             }
         } catch {
@@ -112,15 +116,15 @@ public struct RemoteTranslationRepository: TranslationRepository {
 
     static let invalid = DomainError.server(code: "INVALID_RESPONSE", message: nil)
 
-    static func direction(_ d: TranslationDirection) -> Components.Schemas.TranslationDirection {
-        switch d {
+    static func direction(_ dto: TranslationDirection) -> Components.Schemas.TranslationDirection {
+        switch dto {
         case .jargonToPlain: .jargonToPlain
         case .plainToJargon: .plainToJargon
         }
     }
 
-    static func inputSource(_ s: Components.Schemas.InputSource?) -> InputSource {
-        switch s {
+    static func inputSource(_ src: Components.Schemas.InputSource?) -> InputSource {
+        switch src {
         case .screenshot: .screenshot
         case .recording: .recording
         case ._extension: .extension
@@ -136,70 +140,70 @@ public struct RemoteTranslationRepository: TranslationRepository {
         Page(items: items, page: meta.page, totalElements: meta.totalElements, totalPages: meta.totalPages)
     }
 
-    static func action(_ a: Components.Schemas.ActionItem) throws -> ActionItem {
-        guard let id = a.actionId, let text = a.actionText else { throw invalid }
+    static func action(_ raw: Components.Schemas.ActionItem) throws -> ActionItem {
+        guard let id = raw.actionId, let text = raw.actionText else { throw invalid }
         return ActionItem(
-            id: id, sortOrder: a.sortOrder ?? 0, text: text, dueHint: a.dueHint, dueAt: a.dueAt,
-            isChecked: a.isChecked ?? false, alertEnabled: a.alertEnabled ?? true
+            id: id, sortOrder: raw.sortOrder ?? 0, text: text, dueHint: raw.dueHint, dueAt: raw.dueAt,
+            isChecked: raw.isChecked ?? false, alertEnabled: raw.alertEnabled ?? true
         )
     }
 
-    static func translation(_ t: Components.Schemas.TranslationResponse) throws -> Translation {
-        guard let id = t.translationId, let source = t.sourceText, let result = t.resultText else { throw invalid }
-        let nuance = t.nuance.flatMap { payload -> Nuance? in
+    static func translation(_ dto: Components.Schemas.TranslationResponse) throws -> Translation {
+        guard let id = dto.translationId, let source = dto.sourceText, let result = dto.resultText else { throw invalid }
+        let nuance = dto.nuance.flatMap { payload -> Nuance? in
             guard let note = payload.value1.note, !note.isEmpty else { return nil }
             return Nuance(note: note, tip: payload.value1.tip ?? "", confidence: Double(payload.value1.confidence ?? 0))
         }
-        let terms: [DetectedTerm] = (t.detectedTerms ?? []).compactMap { d in
-            guard let start = d.startIndex, let end = d.endIndex, let matched = d.matchedText else { return nil }
+        let terms: [DetectedTerm] = (dto.detectedTerms ?? []).compactMap { dto in
+            guard let start = dto.startIndex, let end = dto.endIndex, let matched = dto.matchedText else { return nil }
             return DetectedTerm(
-                termId: d.termId, termKo: d.termKo ?? matched, plainKo: d.plainKo ?? "", matchedText: matched,
-                startIndex: start, endIndex: end, inMyCards: d.inMyCards ?? false
+                termId: dto.termId, termKo: dto.termKo ?? matched, plainKo: dto.plainKo ?? "", matchedText: matched,
+                startIndex: start, endIndex: end, inMyCards: dto.inMyCards ?? false
             )
         }
         return try Translation(
             id: id,
-            projectId: t.projectId ?? 0,
-            projectName: t.projectName ?? "",
-            meetingTitle: t.meetingTitle,
-            inputSource: inputSource(t.inputSource),
+            projectId: dto.projectId ?? 0,
+            projectName: dto.projectName ?? "",
+            meetingTitle: dto.meetingTitle,
+            inputSource: inputSource(dto.inputSource),
             sourceText: source,
             resultText: result,
-            jargonCount: t.jargonCount ?? terms.count,
-            intent: intent(t.intentType?.value1),
+            jargonCount: dto.jargonCount ?? terms.count,
+            intent: intent(dto.intentType?.value1),
             nuance: nuance,
-            actions: (t.actionItems ?? []).map(action).sorted { $0.sortOrder < $1.sortOrder },
+            actions: (dto.actionItems ?? []).map(action).sorted { $0.sortOrder < $1.sortOrder },
             terms: terms,
-            aiModel: t.aiModel ?? "",
-            createdAt: t.createdAt ?? Date()
+            aiModel: dto.aiModel ?? "",
+            createdAt: dto.createdAt ?? Date()
         )
     }
 
-    static func summary(_ s: Components.Schemas.TranslationSummary) throws -> TranslationSummary {
-        guard let id = s.translationId else { throw invalid }
+    static func summary(_ src: Components.Schemas.TranslationSummary) throws -> TranslationSummary {
+        guard let id = src.translationId else { throw invalid }
         return TranslationSummary(
             id: id,
-            title: s.title ?? String((s.sourceText ?? "").prefix(24)),
-            inputSource: inputSource(s.inputSource),
-            sourceText: s.sourceText ?? "",
-            resultText: s.resultText ?? "",
-            jargonCount: s.jargonCount ?? 0,
-            intent: intent(s.intentType?.value1),
-            actionCount: s.actionCount ?? 0,
-            openActionCount: s.openActionCount ?? 0,
-            createdAt: s.createdAt ?? Date()
+            title: src.title ?? String((src.sourceText ?? "").prefix(24)),
+            inputSource: inputSource(src.inputSource),
+            sourceText: src.sourceText ?? "",
+            resultText: src.resultText ?? "",
+            jargonCount: src.jargonCount ?? 0,
+            intent: intent(src.intentType?.value1),
+            actionCount: src.actionCount ?? 0,
+            openActionCount: src.openActionCount ?? 0,
+            createdAt: src.createdAt ?? Date()
         )
     }
 
-    static func upcoming(_ a: Components.Schemas.ActionWithSource) throws -> UpcomingAction {
-        guard let translationId = a.value2.translationId else { throw invalid }
+    static func upcoming(_ raw: Components.Schemas.ActionWithSource) throws -> UpcomingAction {
+        guard let translationId = raw.value2.translationId else { throw invalid }
         return try UpcomingAction(
-            action: action(a.value1),
+            action: action(raw.value1),
             translationId: translationId,
-            projectName: a.value2.projectName ?? "",
-            meetingTitle: a.value2.meetingTitle,
+            projectName: raw.value2.projectName ?? "",
+            meetingTitle: raw.value2.meetingTitle,
             inputSource: nil,
-            createdAt: a.value2.createdAt ?? Date()
+            createdAt: raw.value2.createdAt ?? Date()
         )
     }
 }
