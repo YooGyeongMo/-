@@ -47,19 +47,11 @@ jobs:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: astral-sh/setup-uv@caf0cab7a618c569241d31dcd442f54681755d39 # v3
       - run: uv sync --locked
-      # 구현된 operation 만 검사한다(나머지는 아직 404). 라우터를 추가하면 --include-operation-id 를 늘린다.
-      # 알려진 계약 차이(ADR-0014 §5)는 services/api/schemathesis.toml 과 아래 exclude 로만 끈다.
-      # 2026-10-26 이전엔 `|| true` + schemathesis 4 에 없는 옵션(--hypothesis-max-examples)이라
-      # 명령이 매번 옵션 오류로 끝나고도 초록이었다(검사 0건).
-      - run: |
-          (uv run uvicorn app.main:app --port 8080 &)
-          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:8080/health && break; sleep 1; done
-          uv run schemathesis run http://127.0.0.1:8080/openapi.json \
-            --url http://127.0.0.1:8080/api \
-            --checks all --exclude-checks allow_header_conformance \
-            --max-examples=100 \
-            --include-operation-id oauthLogin \
-            --include-operation-id getMe
+      # 구현된 operation 만 검사한다(목록은 scripts/contract_check.sh). 개발 서버(SQLite + 개발용 로그인,
+      # MWONMAL_ENV=test)를 띄우고 로그인 토큰을 붙여 성공(2xx) 응답의 스키마까지 본다(#110).
+      # 알려진 계약 차이(ADR-0014 §5)는 services/api/schemathesis.toml 과 스크립트의 exclude 로만 끈다.
+      # 2026-10-26 이전엔 `|| true` + schemathesis 4 에 없는 옵션이라 검사 0건으로도 초록이었다.
+      - run: scripts/contract_check.sh 100
   image:
     # 순서가 중요하다: 빌드 → 스캔 → (main 이면) push. 스캔을 통과한 이미지만 레지스트리에 올라간다.
     # 2026-09-22 개정(이슈: main 만 빨개짐):

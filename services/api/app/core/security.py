@@ -72,6 +72,10 @@ def _keys() -> _Keys:
 def check_keys() -> None:
     """기동 시 호출. 키가 없거나(local·test 제외) 잘못됐으면 예외로 기동을 막는다."""
     _keys()
+    if settings.dev_login and settings.env not in EPHEMERAL_ENVS:
+        raise RuntimeError("MWONMAL_DEV_LOGIN 은 local·test 에서만 켤 수 있다")
+    if not settings.redis_url and settings.env not in EPHEMERAL_ENVS:
+        raise RuntimeError("MWONMAL_REDIS_URL 이 없다 (한도 카운터를 프로세스끼리 공유해야 한다)")
 
 
 def issue_token(user_id: int, role: str, now: datetime | None = None) -> str:

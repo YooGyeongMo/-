@@ -10,11 +10,12 @@ from pydantic import BaseModel
 from app.core.auth import CurrentPrincipal
 from app.core.db import DbSession
 from app.core.errors import DomainError, ErrorCode
-from app.core.security import issue_token
+from app.core.security import EPHEMERAL_ENVS, issue_token
 from app.core.settings import settings
 from app.core.time import to_api
 from app.identity.domain.model import Account, OAuthProvider
 from app.identity.infra.apple import AppleOAuth
+from app.identity.infra.dev_oauth import DevOAuth
 from app.identity.infra.repository import SqlAccountRepository
 from app.identity.usecases.login import login
 from app.identity.usecases.me import get_me
@@ -40,6 +41,8 @@ def oauth_provider(
     if provider != "apple":
         # v1.0 은 Apple 만 (ADR-0013). 카카오·Google → #90.
         raise DomainError(ErrorCode.INVALID_INPUT, "지금은 Apple 로그인만 지원해요.", "provider")
+    if settings.dev_login and settings.env in EPHEMERAL_ENVS:
+        return DevOAuth(apple)
     return apple
 
 

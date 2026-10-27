@@ -75,7 +75,14 @@ def test_contract_job_is_not_masked() -> None:
     text = (ROOT / ".github" / "workflows" / "server.yml").read_text(encoding="utf-8")
     contract = text.split("  contract:")[1].split("\n  image:")[0]
     assert "|| true" not in _code_lines(contract).__str__()
-    assert "schemathesis run" in contract
+    assert "scripts/contract_check.sh" in contract
+    script = (ROOT / "services" / "api" / "scripts" / "contract_check.sh").read_text(
+        encoding="utf-8"
+    )
+    assert "schemathesis run" in script and "set -euo pipefail" in script
+    assert "|| true" not in script
+    # 성공 경로까지 보도록 로그인 토큰을 붙인다(#110).
+    assert "Authorization: Bearer" in script
 
 
 def test_runtime_stage_has_no_uv() -> None:

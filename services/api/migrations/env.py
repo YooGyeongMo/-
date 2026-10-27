@@ -12,7 +12,8 @@ from app.core.settings import settings
 
 config = context.config
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    # 이미 만들어진 앱 로거(app.*, mwonmal.*)를 끄지 않는다(테스트에서 카나리·감사 로그가 사라졌다).
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 URL = config.attributes.get("database_url") or settings.database_url
 

@@ -17,6 +17,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.all_models import metadata
 from app.core.db import session
+from app.decode.infra.repository import reset_dictionary_cache
+from app.decode.infra.seed import seed
 from app.identity.api.routes import apple_oauth
 from app.identity.infra.apple import APPLE_ISSUER, KEYS_URL, TOKEN_URL, AppleOAuth
 from app.main import app
@@ -89,6 +91,11 @@ class FakeApple:
 
 
 @pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+@pytest.fixture
 def fake_apple() -> FakeApple:
     return FakeApple()
 
@@ -114,3 +121,13 @@ def client(tmp_path: Path, fake_apple: FakeApple) -> Iterator[TestClient]:
 async def _create_all(engine: Any) -> None:
     async with engine.begin() as conn:
         await conn.run_sync(metadata.create_all)
+        await conn.run_sync(seed)
+    reset_dictionary_cache()
+
+
+def login(client: TestClient, fake_apple: FakeApple, name: str = "u1") -> dict[str, str]:
+    """가짜 Apple 로 가입·로그인하고 Authorization 헤더를 돌려준다."""
+    fake_apple.add_user(f"code-{name}", sub=f"sub-{name}", email=f"{name}@privaterelay.appleid.com")
+    r = client.post("/api/auth/oauth/apple", json={"code": f"code-{name}", "redirectUri": "x"})
+    assert r.status_code == 200, r.text
+    return {"Authorization": f"Bearer {r.json()['accessToken']}"}

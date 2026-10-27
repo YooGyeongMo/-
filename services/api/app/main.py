@@ -14,7 +14,9 @@ from app.core import errors, security
 from app.core.db import get_engine, ping
 from app.core.http import BodyLimitMiddleware, SecurityHeadersMiddleware, UnhandledErrorMiddleware
 from app.core.settings import settings
+from app.decode.api.routes import router as decode_router
 from app.identity.api.routes import router as identity_router
+from app.workspace.api.routes import router as workspace_router
 
 CONTRACT = Path(__file__).resolve().parent.parent / settings.contract_path
 
@@ -44,6 +46,8 @@ app.add_middleware(BodyLimitMiddleware)
 app.add_middleware(UnhandledErrorMiddleware)
 app.add_middleware(SecurityHeadersMiddleware)
 app.include_router(identity_router)
+app.include_router(decode_router)
+app.include_router(workspace_router)
 
 
 @app.get("/openapi.json", include_in_schema=False)

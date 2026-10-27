@@ -90,3 +90,6 @@ infra/**/*.tfstate*
 
 # infra: 블루그린 활성 색 상태 (deploy/blue-green.sh)
 infra/.upstream
+
+# 로컬 개발 서버 DB(services/api/scripts/dev_server.py)
+services/api/.local/
