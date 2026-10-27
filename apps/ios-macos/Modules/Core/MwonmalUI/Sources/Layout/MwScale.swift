@@ -25,12 +25,28 @@ public extension View {
     }
 }
 
+/// 루트 한 곳에서 배율과 화면 폭 분류(`mwLayout`)를 같이 넣는다(ADR-0006).
+/// 넓은 화면(Mac·iPad 전체화면)은 Figma pt를 그대로(배율 1) 쓰고 읽기 폭으로 가둔다 — 393pt 기준으로
+/// 키우면 1280pt 창에서 글자가 3배가 된다.
 private struct MwScaleRoot: ViewModifier {
     @State private var width: CGFloat = MwFrame.width
+    #if !os(macOS)
+        @Environment(\.horizontalSizeClass) private var horizontal
+        @Environment(\.verticalSizeClass) private var vertical
+    #endif
+
+    private var layout: MwLayout {
+        #if os(macOS)
+            .wide
+        #else
+            MwLayout.from(horizontal: horizontal, vertical: vertical)
+        #endif
+    }
 
     func body(content: Content) -> some View {
         content
-            .environment(\.mwScale, MwFrame.scale(forWidth: width))
+            .environment(\.mwLayout, layout)
+            .environment(\.mwScale, layout == .wide ? 1 : MwFrame.scale(forWidth: width))
             .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { width = $0 }
     }
 }

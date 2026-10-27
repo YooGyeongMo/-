@@ -32,6 +32,7 @@ public struct ProjectRootView: View {
                     content.padding(.top, 14 * scale)
                 }
                 .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
+                .mwReadableWidth() // 넓은 화면: 가운데 680 (배경은 꽉 채운다)
             }
             .scrollIndicators(.hidden)
         }

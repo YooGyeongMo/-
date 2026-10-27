@@ -154,7 +154,12 @@ public struct MwGlassCircleButton: View {
         .buttonStyle(.plain)
         // 그림 크기는 Figma 그대로(32·44), 누르는 범위만 44pt 이상으로 넓힌다(레이아웃은 밀지 않는다).
         .contentShape(Rectangle().inset(by: -max(0, (44 - diameter * scale) / 2)))
+        // 안의 아이콘은 숨김(장식)이라 iOS 17은 버튼 자체를 접근성 트리에서 뺀다(26은 라벨로 살린다).
+        // → 버튼을 직접 하나의 요소로 만든다: 라벨·버튼 특성·누르기 동작(QA: SE iOS 17 E2E에서 닫기 버튼 없음).
+        .accessibilityElement(children: .ignore)
         .accessibilityLabel(Text(label, bundle: bundle))
+        .accessibilityAddTraits(.isButton)
+        .accessibilityAction { action() }
     }
 }
 

@@ -148,6 +148,7 @@ public struct MyRootView: View {
                     links.padding(.top, 22 * scale)
                 }
                 .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
+                .mwReadableWidth()
             }
             .scrollIndicators(.hidden)
         }

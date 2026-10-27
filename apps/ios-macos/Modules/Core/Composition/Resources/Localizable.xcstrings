@@ -35,6 +35,40 @@
         }
       }
     },
+    "menu.go": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이동"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Go"
+          }
+        }
+      }
+    },
+    "menu.newDecode": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "새 해석"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "New Decode"
+          }
+        }
+      }
+    },
     "my.link.reviewComingSoon": {
       "extractionState": "manual",
       "localizations": {
@@ -99,6 +133,40 @@
           "stringUnit": {
             "state": "translated",
             "value": "You were signed out. Please sign in again."
+          }
+        }
+      }
+    },
+    "sidebar.brand": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "뭔말인교?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mwonmal"
+          }
+        }
+      }
+    },
+    "sidebar.decode": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "판교어 해석"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decode jargon"
           }
         }
       }
@@ -218,6 +286,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "Review cards are coming in the next update."
+          }
+        }
+      }
+    },
+    "translate.result.contextGuess": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사전에는 없지만 앞뒤 문맥으로 판교어 같다고 본 말이에요. 확률이 낮으면 그냥 넘겨도 돼요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in the dictionary, but the context suggests it is jargon. If the probability is low, you can skip it."
           }
         }
       }

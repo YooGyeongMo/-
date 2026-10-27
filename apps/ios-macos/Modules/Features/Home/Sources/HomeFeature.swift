@@ -91,6 +91,7 @@ public struct HomeRootView: View {
 
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwLayout) private var layout
 
     public init(
         model: @autoclosure @escaping () -> HomeViewModel,
@@ -106,22 +107,13 @@ public struct HomeRootView: View {
     }
 
     public var body: some View {
-        ScrollView {
-            ZStack(alignment: .top) {
-                MwHomeHero()
-                VStack(alignment: .leading, spacing: 0) {
-                    topBar.frame(minHeight: 52 * scale).padding(.top, 54 * scale)
-                    header
-                    // 히어로 아래 카드: Figma 51:1328 pt 78(186 + 78 = 264)
-                    reviewCard.padding(.top, (264 - 186) * scale)
-                    actionsSection.padding(.top, 24 * scale)
-                }
+        Group {
+            if layout == .wide {
+                wideBody
+            } else {
+                compactBody
             }
-            .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
         }
-        .scrollIndicators(.hidden)
-        .background(MwColor.canvas.ignoresSafeArea())
-        .ignoresSafeArea(edges: .top)
         .task(id: refreshKey) { await model.load() }
         .refreshable { await model.load() }
         .onChange(of: model.notice) { _, notice in
@@ -359,4 +351,49 @@ public struct HomeRootView: View {
 /// 카탈로그 문구 + 값(키는 점 표기만 쓴다 → 값은 %lld·%@ 자리표시자로 넣는다, check-xcstrings).
 func fmt(_ key: String, _ args: CVarArg...) -> String {
     String(format: String(localized: String.LocalizationValue(key), bundle: .module), arguments: args)
+}
+
+// MARK: - 좁은·넓은 화면 본문(타입 본문 길이 제한 때문에 확장으로 나눔)
+
+extension HomeRootView {
+    private var compactBody: some View {
+        ScrollView {
+            ZStack(alignment: .top) {
+                MwHomeHero()
+                VStack(alignment: .leading, spacing: 0) {
+                    topBar.frame(minHeight: 52 * scale).padding(.top, 54 * scale)
+                    header
+                    // 히어로 아래 카드: Figma 51:1328 pt 78(186 + 78 = 264)
+                    reviewCard.padding(.top, (264 - 186) * scale)
+                    actionsSection.padding(.top, 24 * scale)
+                }
+            }
+            .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
+        }
+        .scrollIndicators(.hidden)
+        .background(MwColor.canvas.ignoresSafeArea())
+        .ignoresSafeArea(edges: .top)
+    }
+
+    /// 넓은 화면(Mac·iPad, 웹 W-00 개요의 두 열): 왼쪽 = 날짜·"오늘"·다가오는 할 일, 오른쪽 = 등급·퇴근길 복습.
+    /// 프로젝트 고르기는 사이드바에 있으므로 위 칩은 그리지 않는다.
+    private var wideBody: some View {
+        ScrollView {
+            HStack(alignment: .top, spacing: 24) {
+                VStack(alignment: .leading, spacing: 0) {
+                    header
+                    actionsSection.padding(.top, 24)
+                }
+                .frame(maxWidth: MwLayout.readableWidth)
+                VStack(spacing: 16) {
+                    levelCard
+                    reviewCard
+                }
+                .frame(width: MwLayout.asideWidth)
+            }
+            .padding(32)
+            .frame(maxWidth: .infinity)
+        }
+        .background(MwColor.canvas.ignoresSafeArea())
+    }
 }

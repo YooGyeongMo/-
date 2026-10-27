@@ -25,7 +25,7 @@ ALLOWED = {
 FEATURE_ALLOWED = {"Domain", "DomainTesting", "MwonmalUI", "Routing", "FeatureKit"}
 # 조립 루트·앱·테스트·예제는 검사하지 않는다(테스트는 대상 + DomainTesting만 두는 관례).
 SKIP_SUFFIXES = ("Tests", "Example")
-SKIP = {"Composition", "MwonmalIOS", "MwonmalMac", "MwonmalUICatalog", "MwonmalE2E"}
+SKIP = {"Composition", "MwonmalIOS", "MwonmalMac", "MwonmalUICatalog", "MwonmalE2E", "MwonmalMacE2E"}
 
 
 def dep_names(target):

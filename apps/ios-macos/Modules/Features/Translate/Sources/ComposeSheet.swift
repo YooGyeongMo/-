@@ -12,8 +12,10 @@ public struct ComposeSheet: View {
     let aiConsent: Bool
     let onResult: (Domain.Translation) -> Void
     let onNotice: (LocalizedStringKey) -> Void
+    let dependencies: TranslateDependencies
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwLayout) private var layout
     @FocusState private var focused: Bool
 
     public init(
@@ -23,6 +25,7 @@ public struct ComposeSheet: View {
         onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }
     ) {
         _model = ViewModelState(wrappedValue: ComposeViewModel(dependencies: dependencies))
+        self.dependencies = dependencies
         self.aiConsent = aiConsent
         self.onResult = onResult
         self.onNotice = onNotice
@@ -31,7 +34,19 @@ public struct ComposeSheet: View {
     public var body: some View {
         // 키보드가 올라와도 버튼·안내가 가려지지 않게 스크롤, 끌면 키보드가 내려간다(QA H3).
         ScrollView {
-            sheetContent
+            if layout == .wide {
+                // 넓은 화면(웹 W-01): 가운데 입력 카드 + 오른쪽 최근 해석 열. 시트가 아니라 상세 영역의 한 페이지.
+                HStack(alignment: .top, spacing: 24) {
+                    sheetContent.frame(maxWidth: MwLayout.readableWidth)
+                    RecentTranslationsAside(dependencies: dependencies)
+                        .frame(width: MwLayout.asideWidth)
+                        .padding(.top, 24)
+                }
+                .padding(32)
+                .frame(maxWidth: .infinity)
+            } else {
+                sheetContent
+            }
         }
         .scrollDismissesKeyboard(.interactively)
         .scrollBounceBehavior(.basedOnSize)
@@ -47,7 +62,9 @@ public struct ComposeSheet: View {
 
     private var sheetContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MwGrabber().frame(maxWidth: .infinity).padding(.top, 10 * scale)
+            if layout == .compact {
+                MwGrabber().frame(maxWidth: .infinity).padding(.top, 10 * scale)
+            }
             HStack {
                 modePicker
                 Spacer()
@@ -55,6 +72,8 @@ public struct ComposeSheet: View {
                     model.cancel()
                     router.dismissSheet()
                 }
+                .keyboardShortcut(.cancelAction)
+                .accessibilityIdentifier("compose.close")
             }
             .padding(.top, 14 * scale)
             Text("translate.compose.title", bundle: .module)
@@ -184,6 +203,7 @@ public struct ComposeSheet: View {
                 .font(MwFont.pretendard(.semiBold, size: 17 * scale))
             }
             .buttonStyle(MwPrimaryButtonStyle(height: 52, radius: 18))
+            .keyboardShortcut(.return, modifiers: .command) // ⌘↩ (Mac·iPad 키보드, ADR-0006)
             .disabled(!model.canSubmit)
             .padding(.top, 14 * scale)
             .accessibilityIdentifier("compose.submit")

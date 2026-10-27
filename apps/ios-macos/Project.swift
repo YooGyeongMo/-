@@ -102,6 +102,16 @@ let apps: [Target] = [
         sources: ["Apps/IOS/E2E/**"],
         dependencies: [.target(name: "MwonmalIOS")]
     ),
+    // macOS E2E(같은 로컬 서버). 사이드바 → 붙여넣기 페이지 → 결과 두 열 → 기록 → MY → 설정 → 로그아웃.
+    .target(
+        name: "MwonmalMacE2E",
+        destinations: [.mac],
+        product: .uiTests,
+        bundleId: "kr.mwonmal.mac.e2e",
+        deploymentTargets: .macOS("14.0"),
+        sources: ["Apps/Mac/E2E/**"],
+        dependencies: [.target(name: "MwonmalMac")]
+    ),
     .target(
         name: "MwonmalUICatalog",
         destinations: [.iPhone, .iPad, .mac],
@@ -147,6 +157,12 @@ let project = Project(
             buildAction: .buildAction(targets: ["MwonmalIOS", "MwonmalE2E"]),
             testAction: .targets(["MwonmalE2E"]),
             runAction: .runAction(executable: "MwonmalIOS")
+        ),
+        .scheme(
+            name: "MwonmalMacE2E",
+            buildAction: .buildAction(targets: ["MwonmalMac", "MwonmalMacE2E"]),
+            testAction: .targets(["MwonmalMacE2E"]),
+            runAction: .runAction(executable: "MwonmalMac")
         ),
         .scheme(
             name: "MwonmalUICatalog",

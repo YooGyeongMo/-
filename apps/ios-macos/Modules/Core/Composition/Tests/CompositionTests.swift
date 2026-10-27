@@ -1,6 +1,7 @@
 @testable import Composition
 import Domain
 import DomainTesting
+import Routing
 import Testing
 
 @MainActor
@@ -89,5 +90,22 @@ struct AppSessionTests {
         #expect(app.state == .signedOut)
         #expect(app.lastError == .unauthorized)
         #expect(await consent.granted == false)
+    }
+}
+
+struct WideRootTests {
+    @Test("넓은 화면: 붙여넣기·결과는 상세 페이지, 용어·설정은 모달") func inlineSheets() {
+        #expect(AppSheet.compose.isInlineOnWide)
+        #expect(AppSheet.result(translationId: 1).isInlineOnWide)
+        #expect(!AppSheet.term(termId: 1).isInlineOnWide)
+        #expect(!AppSheet.settings.isInlineOnWide)
+    }
+
+    @Test("사이드바 제목·아이콘이 탭 4개 모두에 있다") func sidebarCovers() {
+        for tab in AppTab.allCases {
+            _ = WideSidebar.titleKey(tab)
+            _ = WideSidebar.icon(tab)
+        }
+        #expect(AppTab.allCases.count == 4)
     }
 }

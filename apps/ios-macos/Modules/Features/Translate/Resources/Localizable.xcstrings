@@ -375,6 +375,40 @@
         }
       }
     },
+    "translate.compose.recent": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "최근 해석"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Recent"
+          }
+        }
+      }
+    },
+    "translate.compose.recentEmpty": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "아직 해석한 기록이 없어요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No decodes yet."
+          }
+        }
+      }
+    },
     "translate.compose.sourceChip": {
       "extractionState": "manual",
       "localizations": {
@@ -953,6 +987,23 @@
         }
       }
     },
+    "translate.result.contextGuess": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "사전에는 없지만 앞뒤 문맥으로 판교어 같다고 본 말이에요. 확률이 낮으면 그냥 넘겨도 돼요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Not in the dictionary, but the context suggests it is jargon. If the probability is low, you can skip it."
+          }
+        }
+      }
+    },
     "translate.result.deleteFailed": {
       "extractionState": "manual",
       "localizations": {
@@ -1000,6 +1051,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "From a screenshot"
+          }
+        }
+      }
+    },
+    "translate.result.guessMeaning": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, 사전에 없는 말, 판교어일 확률 %2$lld%%"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$@, not in the dictionary, %2$lld%% likely jargon"
           }
         }
       }

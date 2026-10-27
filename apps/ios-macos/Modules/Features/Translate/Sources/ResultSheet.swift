@@ -13,6 +13,7 @@ public struct ResultSheet: View {
     let onChange: () -> Void
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwLayout) private var layout
 
     public init(
         translationId: Int64,
@@ -31,6 +32,28 @@ public struct ResultSheet: View {
     }
 
     public var body: some View {
+        Group {
+            if layout == .wide {
+                wideBody
+            } else {
+                sheetBody
+            }
+        }
+        .background(MwColor.canvas.ignoresSafeArea())
+        .task {
+            model.onChange = onChange
+            await model.load()
+        }
+        .onChange(of: model.notice) { _, notice in
+            if let notice {
+                onNotice(notice)
+                model.notice = nil
+            }
+        }
+    }
+
+    /// 좁은 화면: 아래에서 올라오는 시트(A-06).
+    private var sheetBody: some View {
         ZStack(alignment: .bottom) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
@@ -45,16 +68,42 @@ public struct ResultSheet: View {
         }
         // Figma 51:2362 pb 42 는 홈 인디케이터를 포함한 화면 아래 끝 기준이다.
         .ignoresSafeArea(edges: .bottom)
-        .background(MwColor.canvas.ignoresSafeArea())
-        .task {
-            model.onChange = onChange
-            await model.load()
-        }
-        .onChange(of: model.notice) { _, notice in
-            if let notice {
-                onNotice(notice)
-                model.notice = nil
+    }
+
+    /// 넓은 화면(Mac·iPad): 웹 W-03처럼 두 열. 왼쪽 = 원문·쉬운 말·숨은 뜻, 오른쪽 = 시킨 일·모르는 말·담기 버튼.
+    private var wideBody: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header(model.translation.value)
+                switch model.translation {
+                case .idle, .loading:
+                    ProgressView().frame(maxWidth: .infinity, minHeight: 240)
+                case let .failed(code):
+                    failure(code).padding(.top, 24)
+                case let .loaded(item):
+                    HStack(alignment: .top, spacing: 24) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sourceCard(item)
+                            if let nuance = item.nuance {
+                                nuanceCard(nuance, intent: item.intent)
+                            }
+                        }
+                        .frame(maxWidth: MwLayout.readableWidth)
+                        VStack(alignment: .leading, spacing: 0) {
+                            actionsBlock(item)
+                            termsBlock(item)
+                            if !item.terms.isEmpty {
+                                addAllButton.padding(.top, 16)
+                            }
+                        }
+                        .frame(width: MwLayout.asideWidth + 40)
+                    }
+                    .padding(.top, 16)
+                }
             }
+            .padding(32)
+            .frame(maxWidth: MwLayout.readableWidth + MwLayout.asideWidth + 40 + 24 + 64, alignment: .leading)
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -65,14 +114,7 @@ public struct ResultSheet: View {
             ProgressView().frame(maxWidth: .infinity, minHeight: 240 * scale)
         case let .failed(code):
             header(nil)
-            Text(
-                code == "NOT_FOUND" ? "translate.result.notFound" : code == "OFFLINE" ? "translate.error.offline" :
-                    "translate.error.generic",
-                bundle: .module
-            )
-            .mwFont(.regular, 15, lineHeight: 22)
-            .foregroundStyle(MwColor.textSecondary)
-            .padding(.top, 24 * scale)
+            failure(code).padding(.top, 24 * scale)
         case let .loaded(item):
             header(item)
             VStack(alignment: .leading, spacing: 0) {
@@ -80,27 +122,49 @@ public struct ResultSheet: View {
                 if let nuance = item.nuance {
                     nuanceCard(nuance, intent: item.intent).padding(.top, 12 * scale)
                 }
-                if !item.actions.isEmpty {
-                    MwSectionHeader(Text("translate.result.actions", bundle: .module)).padding(.top, 12 * scale)
-                    VStack(spacing: 0) {
-                        ForEach(Array(item.actions.enumerated()), id: \.element.id) { index, action in
-                            if index > 0 {
-                                MwRowDivider()
-                            }
-                            ActionLine(action: action) { Task { await model.toggle(action) } }
-                        }
+                actionsBlock(item).padding(.top, 12 * scale)
+                termsBlock(item)
+            }
+        }
+    }
+}
+
+// MARK: - 조각(타입 본문 길이 제한 때문에 확장으로 나눔, 같은 파일이라 private 접근 가능)
+
+extension ResultSheet {
+    private func failure(_ code: String) -> some View {
+        Text(
+            code == "NOT_FOUND" ? "translate.result.notFound" : code == "OFFLINE" ? "translate.error.offline" :
+                "translate.error.generic",
+            bundle: .module
+        )
+        .mwFont(.regular, 15, lineHeight: 22)
+        .foregroundStyle(MwColor.textSecondary)
+    }
+
+    @ViewBuilder private func actionsBlock(_ item: Domain.Translation) -> some View {
+        if !item.actions.isEmpty {
+            MwSectionHeader(Text("translate.result.actions", bundle: .module))
+            VStack(spacing: 0) {
+                ForEach(Array(item.actions.enumerated()), id: \.element.id) { index, action in
+                    if index > 0 {
+                        MwRowDivider()
                     }
-                    .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
-                    .clipShape(RoundedRectangle(cornerRadius: 20 * scale, style: .circular))
-                    .mwCardShadow(scale)
+                    ActionLine(action: action) { Task { await model.toggle(action) } }
                 }
-                if !item.terms.isEmpty {
-                    MwSectionHeader(Text("translate.result.terms", bundle: .module)).padding(.top, 12 * scale)
-                    MwFlowLayout(spacing: 6 * scale) {
-                        ForEach(Array(item.terms.enumerated()), id: \.offset) { _, term in
-                            TermChip(term: term) { open(term) }
-                        }
-                    }
+            }
+            .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
+            .clipShape(RoundedRectangle(cornerRadius: 20 * scale, style: .circular))
+            .mwCardShadow(scale)
+        }
+    }
+
+    @ViewBuilder private func termsBlock(_ item: Domain.Translation) -> some View {
+        if !item.terms.isEmpty {
+            MwSectionHeader(Text("translate.result.terms", bundle: .module)).padding(.top, 12 * scale)
+            MwFlowLayout(spacing: 6 * scale) {
+                ForEach(Array(item.terms.enumerated()), id: \.offset) { _, term in
+                    TermChip(term: term) { open(term) }
                 }
             }
         }
@@ -116,6 +180,7 @@ public struct ResultSheet: View {
                 MwGlassCircleButton(.close, diameter: 32, label: "translate.result.close", bundle: .module) {
                     router.dismissSheet()
                 }
+                .keyboardShortcut(.cancelAction)
                 .accessibilityIdentifier("result.close")
             }
             Text("translate.result.title", bundle: .module)
@@ -158,7 +223,8 @@ public struct ResultSheet: View {
                     start: $0.startIndex,
                     end: $0.endIndex,
                     termId: $0.termId,
-                    meaning: "\($0.termKo), \($0.plainKo)"
+                    meaning: $0.isContextGuess ? fmt("translate.result.guessMeaning", $0.termKo, Int(($0.confidence * 100).rounded()))
+                        : "\($0.termKo), \($0.plainKo)"
                 ) }
             ) { id in router.present(.term(termId: id)) }
                 .padding(.top, 4 * scale)
@@ -221,7 +287,7 @@ public struct ResultSheet: View {
         .accessibilityElement(children: .combine)
     }
 
-    private var bottomButton: some View {
+    private var addAllButton: some View {
         Button {
             onNotice("translate.result.cardsComingSoon")
         } label: {
@@ -231,16 +297,22 @@ public struct ResultSheet: View {
             }
         }
         .buttonStyle(MwPrimaryButtonStyle(height: 56, radius: 18))
-        .padding(.horizontal, 20 * scale)
-        .padding(.top, 10 * scale)
-        .padding(.bottom, 42 * scale)
-        .background(MwColor.canvas)
-        .opacity(model.translation.value?.terms.isEmpty == false ? 1 : 0)
+    }
+
+    private var bottomButton: some View {
+        addAllButton
+            .padding(.horizontal, 20 * scale)
+            .padding(.top, 10 * scale)
+            .padding(.bottom, 42 * scale)
+            .background(MwColor.canvas)
+            .opacity(model.translation.value?.terms.isEmpty == false ? 1 : 0)
     }
 
     private func open(_ term: DetectedTerm) {
         if let id = term.termId {
             router.present(.term(termId: id))
+        } else if term.isContextGuess {
+            onNotice("translate.result.contextGuess")
         } else {
             onNotice("translate.result.newTerm")
         }
@@ -255,133 +327,6 @@ extension IntentLabel {
         case .decline: "translate.intent.decline"
         case .share: "translate.intent.share"
         case .question: "translate.intent.question"
-        }
-    }
-}
-
-/// 용어 칩(Figma 51:2335 담음 = 초록 ✓, 51:2345 안 담음 = 노랑 +): 34 높이, 모서리 20, 14 SemiBold.
-struct TermChip: View {
-    let term: DetectedTerm
-    let action: () -> Void
-    @Environment(\.mwScale) private var scale
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6 * scale) {
-                if term.inMyCards {
-                    MwIconView(.check, color: MwColor.doneText)
-                } else {
-                    Text(verbatim: "+").font(MwFont.pretendard(.extraBold, size: 14 * scale))
-                }
-                Text(verbatim: term.termKo).font(MwFont.pretendard(.semiBold, size: 14 * scale))
-            }
-            .foregroundStyle(term.inMyCards ? MwColor.doneText : MwColor.jargonChipText)
-            .padding(.horizontal, 11 * scale)
-            .frame(minHeight: 34 * scale)
-            .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular)
-                .fill(term.inMyCards ? MwColor.doneFill : MwColor.jargonChipFill))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(Text(verbatim: "\(term.termKo), \(term.plainKo)"))
-        .accessibilityHint(Text("translate.result.termHint", bundle: .module))
-    }
-}
-
-/// 용어 시트: 이름·원어·쉬운 말·뜻·예문(GET /terms/{id}).
-public struct TermSheet: View {
-    let termId: Int64
-    let repository: any TranslationRepository
-    let onNotice: (LocalizedStringKey) -> Void
-    @State private var detail: Phase<TermDetail> = .idle
-    @Environment(AppRouter.self) private var router
-    @Environment(\.mwScale) private var scale
-
-    public init(termId: Int64, repository: any TranslationRepository, onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }) {
-        self.termId = termId
-        self.repository = repository
-        self.onNotice = onNotice
-    }
-
-    public var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                MwGrabber().frame(maxWidth: .infinity).padding(.top, 10 * scale)
-                HStack {
-                    Spacer()
-                    MwGlassCircleButton(.close, diameter: 32, label: "translate.result.close", bundle: .module) { router.dismissSheet() }
-                        .accessibilityIdentifier("term.close")
-                }
-                .padding(.top, 8 * scale)
-                switch detail {
-                case .idle, .loading:
-                    ProgressView().frame(maxWidth: .infinity, minHeight: 160 * scale)
-                case .failed:
-                    Text("translate.error.generic", bundle: .module).mwFont(.regular, 15, lineHeight: 22)
-                        .foregroundStyle(MwColor.textSecondary)
-                case let .loaded(term):
-                    loaded(term)
-                }
-            }
-            .padding(.horizontal, 20 * scale)
-            .padding(.bottom, 24 * scale)
-        }
-        .background(MwColor.canvas.ignoresSafeArea())
-        .task {
-            detail = .loading
-            if let loaded = try? await repository.term(id: termId) {
-                detail = .loaded(loaded)
-            } else {
-                detail = .failed(code: "UNKNOWN")
-            }
-        }
-    }
-
-    private func loaded(_ term: TermDetail) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .firstTextBaseline, spacing: 8 * scale) {
-                Text(verbatim: term.termKo).mwFont(.bold, 28, lineHeight: 38, tracking: -0.56).foregroundStyle(MwColor.textPrimary)
-                if let origin = term.originEn {
-                    Text(verbatim: origin).mwFont(.regular, 15).foregroundStyle(MwColor.textSecondary)
-                }
-            }
-            .accessibilityElement(children: .combine)
-            .accessibilityAddTraits(.isHeader)
-            Text("translate.term.plainLabel", bundle: .module).mwFont(.bold, 12, lineHeight: 16).foregroundStyle(MwColor.accentFill)
-                .padding(
-                    .top,
-                    12 * scale
-                )
-            Text(verbatim: term.plainKo).mwFont(.semiBold, 17, lineHeight: 25).foregroundStyle(MwColor.textPrimary).padding(.top, 4 * scale)
-            Text(verbatim: term.meaning)
-                .mwFont(.regular, 15, lineHeight: 22)
-                .foregroundStyle(MwColor.textSecondary)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.top, 8 * scale)
-            if !term.examples.isEmpty {
-                MwSectionHeader(Text("translate.term.examples", bundle: .module)).padding(.top, 20 * scale)
-                VStack(alignment: .leading, spacing: 8 * scale) {
-                    ForEach(term.examples, id: \.self) { example in
-                        VStack(alignment: .leading, spacing: 4 * scale) {
-                            Text(verbatim: example.jargon).mwFont(.regular, 15, lineHeight: 22).foregroundStyle(MwColor.textPrimary)
-                            Text(verbatim: "→ \(example.plain)").mwFont(.semiBold, 15, lineHeight: 22).foregroundStyle(MwColor.accentText)
-                        }
-                    }
-                }
-                .padding(16 * scale)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
-                .mwCardShadow(scale)
-            }
-            Button {
-                onNotice("translate.result.cardsComingSoon")
-            } label: {
-                HStack(spacing: 8 * scale) {
-                    MwIconView(.cards, color: MwColor.accentOnFill)
-                    Text("translate.term.addCard", bundle: .module).font(MwFont.pretendard(.semiBold, size: 17 * scale))
-                }
-            }
-            .buttonStyle(MwPrimaryButtonStyle(height: 52, radius: 18))
-            .padding(.top, 20 * scale)
         }
     }
 }

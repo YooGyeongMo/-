@@ -158,7 +158,8 @@ public struct RemoteTranslationRepository: TranslationRepository {
             guard let start = dto.startIndex, let end = dto.endIndex, let matched = dto.matchedText else { return nil }
             return DetectedTerm(
                 termId: dto.termId, termKo: dto.termKo ?? matched, plainKo: dto.plainKo ?? "", matchedText: matched,
-                startIndex: start, endIndex: end, inMyCards: dto.inMyCards ?? false
+                startIndex: start, endIndex: end, inMyCards: dto.inMyCards ?? false,
+                confidence: min(max(Double(dto.confidence ?? 1), 0), 1)
             )
         }
         return try Translation(
