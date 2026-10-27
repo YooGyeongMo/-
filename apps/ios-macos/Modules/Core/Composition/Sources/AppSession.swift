@@ -171,10 +171,10 @@ public final class AppSession {
         case .signedIn, .unverified: break
         default: return
         }
+        state = .signedOut // 먼저 바꿔 동시에 온 401 은 위 guard 에서 멈춘다
+        lastError = .unauthorized
         try? await signOutUseCase()
         await consent.setGranted(false) // #25: 로그인이 풀리면 AI 동의도 꺼진다
-        lastError = .unauthorized
-        state = .signedOut
     }
 }
 

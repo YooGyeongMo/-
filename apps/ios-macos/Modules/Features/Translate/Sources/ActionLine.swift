@@ -58,7 +58,7 @@ enum DueText {
                 "translate.card.date",
                 Calendar.current.component(.month, from: due),
                 Calendar.current.component(.day, from: due),
-                due.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: "ko_KR")))
+                due.formatted(.dateTime.weekday(.abbreviated))
             )
         }
         let time = due.mwClock
