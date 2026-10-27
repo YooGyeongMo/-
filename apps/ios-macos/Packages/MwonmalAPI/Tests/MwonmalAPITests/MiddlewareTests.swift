@@ -197,7 +197,8 @@ struct APIErrorCauseTests {
 }
 
 struct AIConsentMiddlewareTests {
-    static let translationJSON = #"{"translationId":1,"sourceText":"a","resultText":"a","jargonCount":0,"actionItems":[],"detectedTerms":[],"aiModel":"none/dictionary#p1","createdAt":"2026-10-27T10:00:00"}"#
+    static let translationJSON = #"{"translationId":1,"sourceText":"a","resultText":"a","jargonCount":0,"actionItems":[],"#
+        + #""detectedTerms":[],"aiModel":"none/dictionary#p1","createdAt":"2026-10-27T10:00:00"}"#
 
     private func translate(_ client: Client) async throws {
         _ = try await client.createTranslation(body: .json(.init(sourceText: "a", direction: .jargonToPlain))).created

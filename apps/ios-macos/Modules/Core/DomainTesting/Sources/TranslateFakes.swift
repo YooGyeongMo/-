@@ -16,14 +16,54 @@
             intent: .decision,
             nuance: Nuance(note: "\"밀죠\"는 제안이 아니라 이미 정해진 일이에요. 일정만 확인하세요.", tip: "되묻기보다 일정만 확인하는 편이 안전해요.", confidence: 0.88),
             actions: [
-                ActionItem(id: 5001, sortOrder: 1, text: "역할 정리 문서 만들기", dueHint: "오늘", dueAt: Date(timeIntervalSince1970: 1_793_600_000), isChecked: false, alertEnabled: true),
+                ActionItem(
+                    id: 5001,
+                    sortOrder: 1,
+                    text: "역할 정리 문서 만들기",
+                    dueHint: "오늘",
+                    dueAt: Date(timeIntervalSince1970: 1_793_600_000),
+                    isChecked: false,
+                    alertEnabled: true
+                ),
                 ActionItem(id: 5002, sortOrder: 2, text: "관련 팀과 합의하기", dueHint: "내일", dueAt: nil, isChecked: false, alertEnabled: true),
             ],
             terms: [
-                DetectedTerm(termId: 21, termKo: "스코프 아웃", plainKo: "작업 범위에서 제외", matchedText: "스코프 아웃", startIndex: 8, endIndex: 14, inMyCards: false),
-                DetectedTerm(termId: 25, termKo: "넥스트", plainKo: "다음 차례", matchedText: "넥스트", startIndex: 17, endIndex: 20, inMyCards: false),
-                DetectedTerm(termId: 18, termKo: "R&R", plainKo: "역할과 책임", matchedText: "R&R", startIndex: 31, endIndex: 34, inMyCards: true),
-                DetectedTerm(termId: 3, termKo: "얼라인", plainKo: "방향 맞추기", matchedText: "얼라인", startIndex: 40, endIndex: 43, inMyCards: true),
+                DetectedTerm(
+                    termId: 21,
+                    termKo: "스코프 아웃",
+                    plainKo: "작업 범위에서 제외",
+                    matchedText: "스코프 아웃",
+                    startIndex: 8,
+                    endIndex: 14,
+                    inMyCards: false
+                ),
+                DetectedTerm(
+                    termId: 25,
+                    termKo: "넥스트",
+                    plainKo: "다음 차례",
+                    matchedText: "넥스트",
+                    startIndex: 17,
+                    endIndex: 20,
+                    inMyCards: false
+                ),
+                DetectedTerm(
+                    termId: 18,
+                    termKo: "R&R",
+                    plainKo: "역할과 책임",
+                    matchedText: "R&R",
+                    startIndex: 31,
+                    endIndex: 34,
+                    inMyCards: true
+                ),
+                DetectedTerm(
+                    termId: 3,
+                    termKo: "얼라인",
+                    plainKo: "방향 맞추기",
+                    matchedText: "얼라인",
+                    startIndex: 40,
+                    endIndex: 43,
+                    inMyCards: true
+                ),
             ],
             aiModel: "gemini_free/gemini-2.5-flash#p1",
             createdAt: Date(timeIntervalSince1970: 1_793_580_000)
@@ -64,46 +104,67 @@
         }
     }
 
+    public struct SetActionCall: Sendable, Equatable {
+        public let translationId: Int64
+        public let actionId: Int64
+        public let isChecked: Bool?
+    }
+
     /// 호출을 기록하고 정해 둔 결과를 돌려주는 해석 리포지토리.
     public actor FakeTranslationRepository: TranslationRepository {
         public var translateResult: Result<Translation, DomainError> = .success(.sample)
-        public var listResult: Result<Page<TranslationSummary>, DomainError> = .success(Page(items: [.sample()], page: 1, totalElements: 1, totalPages: 1))
-        public var actionsResult: Result<Page<UpcomingAction>, DomainError> = .success(Page(items: [], page: 1, totalElements: 0, totalPages: 0))
+        public var listResult: Result<Page<TranslationSummary>, DomainError> = .success(Page(
+            items: [.sample()],
+            page: 1,
+            totalElements: 1,
+            totalPages: 1
+        ))
+        public var actionsResult: Result<Page<UpcomingAction>, DomainError> = .success(Page(
+            items: [],
+            page: 1,
+            totalElements: 0,
+            totalPages: 0
+        ))
         public var setActionResult: Result<ActionItem, DomainError>?
         public var projectsResult: Result<[ProjectSummary], DomainError> = .success([])
         /// 해석이 끝나기 전까지 기다리게 한다(취소 테스트).
         public var translateDelay: Duration?
         public private(set) var translateCalls: [(text: String, consent: Bool)] = []
-        public private(set) var setActionCalls: [(translationId: Int64, actionId: Int64, isChecked: Bool?)] = []
+        public private(set) var setActionCalls: [SetActionCall] = []
         public private(set) var deleted: [Int64] = []
 
         public init() {}
 
-        public func setTranslateResult(_ r: Result<Translation, DomainError>) {
-            translateResult = r
+        public func setTranslateResult(_ result: Result<Translation, DomainError>) {
+            translateResult = result
         }
 
-        public func setTranslateDelay(_ d: Duration?) {
-            translateDelay = d
+        public func setTranslateDelay(_ delay: Duration?) {
+            translateDelay = delay
         }
 
-        public func setListResult(_ r: Result<Page<TranslationSummary>, DomainError>) {
-            listResult = r
+        public func setListResult(_ result: Result<Page<TranslationSummary>, DomainError>) {
+            listResult = result
         }
 
-        public func setActionsResult(_ r: Result<Page<UpcomingAction>, DomainError>) {
-            actionsResult = r
+        public func setActionsResult(_ result: Result<Page<UpcomingAction>, DomainError>) {
+            actionsResult = result
         }
 
-        public func setSetActionResult(_ r: Result<ActionItem, DomainError>?) {
-            setActionResult = r
+        public func setSetActionResult(_ result: Result<ActionItem, DomainError>?) {
+            setActionResult = result
         }
 
-        public func setProjectsResult(_ r: Result<[ProjectSummary], DomainError>) {
-            projectsResult = r
+        public func setProjectsResult(_ result: Result<[ProjectSummary], DomainError>) {
+            projectsResult = result
         }
 
-        public func translate(_ text: String, direction: TranslationDirection, projectId: Int64?, aiConsent: Bool) async throws -> Translation {
+        public func translate(
+            _ text: String,
+            direction: TranslationDirection,
+            projectId: Int64?,
+            aiConsent: Bool
+        ) async throws -> Translation {
             translateCalls.append((text, aiConsent))
             if let translateDelay {
                 try await Task.sleep(for: translateDelay)
@@ -124,7 +185,7 @@
         }
 
         public func setAction(translationId: Int64, actionId: Int64, isChecked: Bool?, alertEnabled: Bool?) async throws -> ActionItem {
-            setActionCalls.append((translationId, actionId, isChecked))
+            setActionCalls.append(SetActionCall(translationId: translationId, actionId: actionId, isChecked: isChecked))
             if let setActionResult {
                 return try setActionResult.get()
             }
@@ -145,7 +206,14 @@
         }
 
         public func term(id: Int64) async throws -> TermDetail {
-            TermDetail(id: id, termKo: "얼라인", originEn: "align", plainKo: "방향 맞추기", meaning: "여러 사람의 이해와 목표를 같은 방향으로 맞추는 것.", examples: [TermExample(jargon: "이번 주까지 팀 간 얼라인 부탁드려요.", plain: "이번 주까지 팀끼리 방향을 맞춰 주세요.")])
+            TermDetail(
+                id: id,
+                termKo: "얼라인",
+                originEn: "align",
+                plainKo: "방향 맞추기",
+                meaning: "여러 사람의 이해와 목표를 같은 방향으로 맞추는 것.",
+                examples: [TermExample(jargon: "이번 주까지 팀 간 얼라인 부탁드려요.", plain: "이번 주까지 팀끼리 방향을 맞춰 주세요.")]
+            )
         }
 
         public func projects() async throws -> [ProjectSummary] {

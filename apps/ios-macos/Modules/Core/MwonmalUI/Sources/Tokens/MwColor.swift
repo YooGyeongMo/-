@@ -47,6 +47,9 @@ public enum MwColor {
     public static let tabSelected = token("tab.selected") // 흰 85%
     public static let jargonHighlight = token("jargon.highlight") // #F7C948 50% 형광펜
     public static let sheetGrabber = token("sheet.grabber")
+    /// 홈 히어로(노란 하늘) 위 글자. 그림이 다크에서도 밝아 외관과 상관없이 어두운 색(QA H5).
+    public static let onHeroPrimary = token("onHero.primary")
+    public static let onHeroStrong = token("onHero.strong")
 
     /// 테스트·카탈로그가 전부를 훑을 수 있게.
     public static let allNames: [String] = [
@@ -58,7 +61,7 @@ public enum MwColor {
         "status.doneFill", "status.doneText",
         "text.strong", "text.disabled", "chip.fill", "control.checkbox", "badge.fill", "accent.shadow",
         "accent.softFill", "glass.fill", "glass.fillThin", "glass.border", "tab.selected", "jargon.highlight",
-        "sheet.grabber",
+        "sheet.grabber", "onHero.primary", "onHero.strong",
     ]
 
     static func token(_ name: String) -> Color {

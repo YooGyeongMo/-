@@ -28,9 +28,15 @@ final class MwonmalE2ETests: XCTestCase {
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "안 보임: \(element)", file: file, line: line)
     }
 
-    func testDecodeFlowEndToEnd() throws {
+    func testDecodeFlowEndToEnd() {
         app.launch()
+        signInAndDecode()
+        reviewResult()
+        browseTabs()
+        settingsConsentAndSignOut()
+    }
 
+    private func signInAndDecode() {
         // 1. S-01 로그인
         let apple = app.buttons["signin.apple"]
         wait(apple)
@@ -56,7 +62,9 @@ final class MwonmalE2ETests: XCTestCase {
         editor.typeText(Self.message)
         shot("04-compose")
         app.buttons["compose.submit"].tap()
+    }
 
+    private func reviewResult() {
         // 5. A-06 결과(사전 간이 해석: 동의 꺼짐 기본)
         let plain = app.staticTexts["result.plain"]
         wait(plain, 20)
@@ -90,7 +98,9 @@ final class MwonmalE2ETests: XCTestCase {
         card.tap()
         wait(app.staticTexts["result.plain"])
         app.buttons["result.close"].tap()
+    }
 
+    private func browseTabs() {
         // 7. 홈: 할 일(체크한 것은 목록에서 빠지고 남은 것 표시)
         app.buttons["tab.home"].tap()
         wait(app.staticTexts["다가오는 할 일"])
@@ -98,9 +108,11 @@ final class MwonmalE2ETests: XCTestCase {
 
         // 8. 복습 탭(v1.1 안내)
         app.buttons["tab.review"].tap()
-        wait(app.staticTexts["복습은 12월에 열려요"])
+        wait(app.staticTexts["복습은 다음 업데이트에서 열려요"])
         shot("10-review")
+    }
 
+    private func settingsConsentAndSignOut() {
         // 9. MY → 설정 → AI 외부 전송 동의 → 로그아웃
         app.buttons["tab.my"].tap()
         wait(app.staticTexts["판교 등급"])
@@ -123,6 +135,8 @@ final class MwonmalE2ETests: XCTestCase {
         wait(confirm)
         confirm.tap()
         wait(app.buttons["signin.apple"], 10)
+        // 직접 로그아웃은 "세션 만료" 안내를 띄우지 않는다(QA H1).
+        XCTAssertFalse(app.staticTexts["로그인이 풀렸어요. 다시 로그인해 주세요."].exists)
         shot("14-signed-out")
     }
 }

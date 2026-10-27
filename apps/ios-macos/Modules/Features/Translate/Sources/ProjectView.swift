@@ -12,7 +12,7 @@ public struct ProjectRootView: View {
     let refreshKey: Int
     let onNotice: (LocalizedStringKey) -> Void
     @Environment(AppRouter.self) private var router
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(dependencies: TranslateDependencies, refreshKey: Int = 0, onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }) {
         _model = State(initialValue: ProjectViewModel(dependencies: dependencies))
@@ -25,13 +25,13 @@ public struct ProjectRootView: View {
             MwSceneBackground(.sky)
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    topBar.frame(height: 52 * s).padding(.top, 54 * s)
-                    header.padding(.top, 12 * s)
-                    buttons.padding(.top, 16 * s)
-                    segments.padding(.top, 16 * s)
-                    content.padding(.top, 14 * s)
+                    topBar.frame(minHeight: 52 * scale).padding(.top, 54 * scale)
+                    header.padding(.top, 12 * scale)
+                    buttons.padding(.top, 16 * scale)
+                    segments.padding(.top, 16 * scale)
+                    content.padding(.top, 14 * scale)
                 }
-                .padding(.bottom, MwTabBar<AppTab>.reservedHeight * s)
+                .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
             }
             .scrollIndicators(.hidden)
         }
@@ -46,23 +46,23 @@ public struct ProjectRootView: View {
         }
     }
 
-    // 위 막대: v1.0 프로젝트 탭은 뿌리 화면이라 뒤로 버튼 자리는 비우고(Figma 44×44 자리), 오른쪽 ··· 은 새로고침.
+    /// 위 막대: v1.0 프로젝트 탭은 뿌리 화면이라 뒤로 버튼 자리는 비우고(Figma 44×44 자리), 오른쪽 ··· 은 새로고침.
     private var topBar: some View {
         HStack {
-            Color.clear.frame(width: 44 * s, height: 44 * s)
+            Color.clear.frame(width: 44 * scale, height: 44 * scale)
             Spacer()
             MwGlassCircleButton(.ellipsis, label: "translate.project.more", bundle: .module) {
                 Task { await model.load() }
             }
         }
-        .padding(.horizontal, 16 * s)
+        .padding(.horizontal, 16 * scale)
     }
 
     private var header: some View {
-        HStack(spacing: 8 * s) {
+        HStack(spacing: 8 * scale) {
             MwIconView(.layersFill, color: MwColor.accentOnFill)
-                .frame(width: 34 * s, height: 34 * s)
-                .background(RoundedRectangle(cornerRadius: 11 * s, style: .circular).fill(MwColor.accentFill))
+                .frame(width: 34 * scale, height: 34 * scale)
+                .background(RoundedRectangle(cornerRadius: 11 * scale, style: .circular).fill(MwColor.accentFill))
             VStack(alignment: .leading, spacing: 0) {
                 Text(verbatim: model.project?.name ?? String(localized: "translate.project.defaultName", bundle: .module))
                     .mwFont(.bold, 22, lineHeight: 26, tracking: -0.33)
@@ -73,24 +73,24 @@ public struct ProjectRootView: View {
                     .foregroundStyle(MwColor.textSecondary)
             }
         }
-        .padding(.horizontal, 20 * s)
+        .padding(.horizontal, 20 * scale)
     }
 
     private var description: String {
-        if let d = model.project?.description, !d.isEmpty {
-            return d
+        if let desc = model.project?.description, !desc.isEmpty {
+            return desc
         }
         return String(localized: "translate.project.defaultDescription", bundle: .module)
     }
 
     private var buttons: some View {
-        HStack(spacing: 10 * s) {
+        HStack(spacing: 10 * scale) {
             Button {
                 router.present(.compose)
             } label: {
-                HStack(spacing: 8 * s) {
+                HStack(spacing: 8 * scale) {
                     MwIconView(.sparkles, color: MwColor.accentFill)
-                    Text("translate.project.decode", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * s))
+                    Text("translate.project.decode", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * scale))
                 }
             }
             .buttonStyle(MwSecondaryButtonStyle(height: 48))
@@ -98,26 +98,26 @@ public struct ProjectRootView: View {
             Button {
                 onNotice("translate.project.meetingComingSoon")
             } label: {
-                HStack(spacing: 8 * s) {
+                HStack(spacing: 8 * scale) {
                     MwIconView(.plus, color: MwColor.accentOnFill)
-                    Text("translate.project.newMeeting", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * s))
+                    Text("translate.project.newMeeting", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * scale))
                 }
             }
             .buttonStyle(MwPrimaryButtonStyle(height: 48, radius: 18))
         }
-        .padding(.horizontal, 20 * s)
+        .padding(.horizontal, 20 * scale)
     }
 
     private var segments: some View {
         HStack(spacing: 0) {
-            segment(.translations, Text(verbatim: L("translate.project.tab.translations", model.translationTotal)))
-            segment(.actions, Text(verbatim: L("translate.project.tab.actions", model.openActionTotal)))
-            segment(.terms, Text(verbatim: L("translate.project.tab.terms", model.project?.unknownTermCount ?? 0)))
+            segment(.translations, Text(verbatim: fmt("translate.project.tab.translations", model.translationTotal)))
+            segment(.actions, Text(verbatim: fmt("translate.project.tab.actions", model.openActionTotal)))
+            segment(.terms, Text(verbatim: fmt("translate.project.tab.terms", model.project?.unknownTermCount ?? 0)))
         }
-        .padding(3 * s)
-        .frame(height: 44 * s)
-        .background(RoundedRectangle(cornerRadius: 14 * s, style: .circular).fill(MwColor.glassFillThin))
-        .padding(.horizontal, 20 * s)
+        .padding(3 * scale)
+        .frame(minHeight: 44 * scale)
+        .background(RoundedRectangle(cornerRadius: 14 * scale, style: .circular).fill(MwColor.glassFillThin))
+        .padding(.horizontal, 20 * scale)
     }
 
     private func segment(_ value: ProjectViewModel.Segment, _ title: Text) -> some View {
@@ -126,16 +126,20 @@ public struct ProjectRootView: View {
             model.segment = value
         } label: {
             title
-                .font(MwFont.pretendard(selected ? .semiBold : .medium, size: 15 * s))
+                .font(MwFont.pretendard(selected ? .semiBold : .medium, size: 15 * scale))
                 .foregroundStyle(selected ? MwColor.textPrimary : MwColor.textSecondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background {
                     if selected {
-                        RoundedRectangle(cornerRadius: 11 * s, style: .circular)
+                        RoundedRectangle(cornerRadius: 11 * scale, style: .circular)
                             .fill(MwColor.surface)
-                            .shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.06), radius: 1.5 * s, y: 2 * s)
+                            .shadow(
+                                color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.06),
+                                radius: 1.5 * scale,
+                                y: 2 * scale
+                            )
                     }
                 }
                 .contentShape(Rectangle())
@@ -155,17 +159,20 @@ public struct ProjectRootView: View {
     @ViewBuilder private var translationList: some View {
         switch model.translations {
         case .idle, .loading:
-            ProgressView().frame(maxWidth: .infinity, minHeight: 160 * s)
+            ProgressView().frame(maxWidth: .infinity, minHeight: 160 * scale)
         case let .failed(code):
             StateCard(text: Text(code == "OFFLINE" ? "translate.error.offline" : "translate.error.generic", bundle: .module)) {
                 Task { await model.load() }
             }
         case let .loaded(items) where items.isEmpty:
-            StateCard(text: Text("translate.project.empty", bundle: .module), actionTitle: Text("translate.project.decode", bundle: .module)) {
+            StateCard(
+                text: Text("translate.project.empty", bundle: .module),
+                actionTitle: Text("translate.project.decode", bundle: .module)
+            ) {
                 router.present(.compose)
             }
         case let .loaded(items):
-            LazyVStack(spacing: 12 * s) {
+            LazyVStack(spacing: 12 * scale) {
                 ForEach(items) { item in
                     Button {
                         router.present(.result(translationId: item.id))
@@ -176,14 +183,14 @@ public struct ProjectRootView: View {
                     .task { await model.loadMoreIfNeeded(current: item) }
                 }
             }
-            .padding(.horizontal, 20 * s)
+            .padding(.horizontal, 20 * scale)
         }
     }
 
     @ViewBuilder private var actionList: some View {
         switch model.openActions {
         case .idle, .loading:
-            ProgressView().frame(maxWidth: .infinity, minHeight: 160 * s)
+            ProgressView().frame(maxWidth: .infinity, minHeight: 160 * scale)
         case .failed:
             StateCard(text: Text("translate.error.generic", bundle: .module)) { Task { await model.load() } }
         case let .loaded(items) where items.isEmpty:
@@ -197,12 +204,15 @@ public struct ProjectRootView: View {
                     ActionLine(action: item.action) { Task { await model.toggle(item) } }
                         .contentShape(Rectangle())
                         .onTapGesture { router.present(.result(translationId: item.translationId)) }
+                        .accessibilityAction(named: Text("translate.project.openResult", bundle: .module)) {
+                            router.present(.result(translationId: item.translationId))
+                        }
                 }
             }
-            .background(RoundedRectangle(cornerRadius: 20 * s, style: .circular).fill(MwColor.surface))
-            .clipShape(RoundedRectangle(cornerRadius: 20 * s, style: .circular))
-            .mwCardShadow(s)
-            .padding(.horizontal, 20 * s)
+            .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
+            .clipShape(RoundedRectangle(cornerRadius: 20 * scale, style: .circular))
+            .mwCardShadow(scale)
+            .padding(.horizontal, 20 * scale)
         }
     }
 
@@ -214,7 +224,7 @@ public struct ProjectRootView: View {
 /// 해석 기록 카드(Figma 51:3404 회의 카드 모양): 날짜·시각 + 오른쪽 알약, 제목 17 SemiBold, 아래 개수 셋.
 struct TranslationCard: View {
     let item: TranslationSummary
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -223,42 +233,48 @@ struct TranslationCard: View {
                     .mwFont(.semiBold, 13, lineHeight: 19)
                     .foregroundStyle(MwColor.textSecondary)
                 Spacer()
-                MwStatusPill(Text(item.inputSource == .screenshot ? "translate.card.screenshot" : "translate.card.pasted", bundle: .module), tone: .neutral, height: 22, size: 11)
+                MwStatusPill(
+                    Text(item.inputSource == .screenshot ? "translate.card.screenshot" : "translate.card.pasted", bundle: .module),
+                    tone: .neutral,
+                    height: 22,
+                    size: 11
+                )
             }
             Text(verbatim: item.title)
                 .mwFont(.semiBold, 17, lineHeight: 25, tracking: -0.085)
                 .foregroundStyle(MwColor.textPrimary)
                 .lineLimit(2)
-                .padding(.top, 4 * s)
-            HStack(spacing: 12 * s) {
-                stat(.sparkleSmall, color: MwColor.textSecondary, Text(verbatim: L("translate.card.jargon", item.jargonCount)))
-                stat(.checklist, color: MwColor.urgentText, Text(verbatim: L("translate.card.actions", item.openActionCount)))
+                .padding(.top, 4 * scale)
+            HStack(spacing: 12 * scale) {
+                stat(.sparkleSmall, color: MwColor.textSecondary, Text(verbatim: fmt("translate.card.jargon", item.jargonCount)))
+                stat(.checklist, color: MwColor.urgentText, Text(verbatim: fmt("translate.card.actions", item.openActionCount)))
                 if let intent = item.intent {
                     stat(.nuance, color: MwColor.jargonChipText, Text(IntentLabel.key(intent), bundle: .module))
                 }
             }
-            .padding(.top, 8 * s)
+            .padding(.top, 8 * scale)
         }
-        .padding(.horizontal, 16 * s)
-        .padding(.vertical, 14 * s)
+        .padding(.horizontal, 16 * scale)
+        .padding(.vertical, 14 * scale)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(RoundedRectangle(cornerRadius: 24 * s, style: .circular).fill(MwColor.surface))
-        .mwRaisedShadow(s)
+        .background(RoundedRectangle(cornerRadius: 24 * scale, style: .circular).fill(MwColor.surface))
+        .mwRaisedShadow(scale)
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.isButton)
     }
 
     private func stat(_ icon: MwIcon, color: Color, _ text: Text) -> some View {
-        HStack(spacing: 2 * s) {
+        HStack(spacing: 2 * scale) {
             MwIconView(icon, color: color)
             text.mwFont(.regular, 13, lineHeight: 19).foregroundStyle(color)
         }
     }
 
+    /// Figma "9월 17일 (수) · 10:00".
     static func dateText(_ date: Date) -> String {
-        let day = date.formatted(.dateTime.month(.defaultDigits).day().weekday(.abbreviated).locale(Locale(identifier: "ko_KR")))
-        let time = date.mwClock
-        return "\(day) · \(time)"
+        let parts = Calendar.current.dateComponents([.month, .day], from: date)
+        let weekday = date.formatted(.dateTime.weekday(.abbreviated).locale(Locale(identifier: "ko_KR")))
+        return fmt("translate.card.date", parts.month ?? 0, parts.day ?? 0, weekday) + " · \(date.mwClock)"
     }
 }
 
@@ -280,7 +296,7 @@ struct StateCard: View {
     let text: Text
     var actionTitle: Text?
     var action: (() -> Void)?
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     init(text: Text, actionTitle: Text? = nil, action: (() -> Void)? = nil) {
         self.text = text
@@ -289,91 +305,17 @@ struct StateCard: View {
     }
 
     var body: some View {
-        VStack(spacing: 12 * s) {
+        VStack(spacing: 12 * scale) {
             text.mwFont(.regular, 15, lineHeight: 22).foregroundStyle(MwColor.textSecondary).multilineTextAlignment(.center)
             if let action, let actionTitle {
-                Button(action: action) { actionTitle.font(MwFont.pretendard(.semiBold, size: 16 * s)) }
+                Button(action: action) { actionTitle.font(MwFont.pretendard(.semiBold, size: 16 * scale)) }
                     .buttonStyle(MwSecondaryButtonStyle(height: 44))
             }
         }
-        .padding(18 * s)
+        .padding(18 * scale)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 20 * s, style: .circular).fill(MwColor.surface))
-        .mwCardShadow(s)
-        .padding(.horizontal, 20 * s)
-    }
-}
-
-/// 할 일 한 줄(A-06 51:2304): 체크 · 17 Medium · 아래 기한 문구 · 오른쪽 오늘/내일 알약.
-struct ActionLine: View {
-    let action: ActionItem
-    let onToggle: () -> Void
-    @Environment(\.mwScale) private var s
-
-    var body: some View {
-        HStack(spacing: 14 * s) {
-            Button(action: onToggle) { MwCheckbox(isOn: action.isChecked) }
-                .buttonStyle(.plain)
-                .frame(width: 26 * s, height: 56 * s)
-                .contentShape(Rectangle().inset(by: -9 * s))
-                .accessibilityLabel(Text(verbatim: action.text))
-                .accessibilityValue(Text(action.isChecked ? "translate.action.done" : "translate.action.notDone", bundle: .module))
-                .accessibilityAddTraits(.isToggle)
-                .accessibilityIdentifier("action.check.\(action.id)")
-            VStack(alignment: .leading, spacing: 0) {
-                Text(verbatim: action.text)
-                    .mwFont(.medium, 17, lineHeight: 24)
-                    .foregroundStyle(action.isChecked ? MwColor.textDisabled : MwColor.textPrimary)
-                    .strikethrough(action.isChecked, color: MwColor.textDisabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                if let detail = DueText.detail(action) {
-                    Text(verbatim: detail)
-                        .mwFont(.regular, 14, lineHeight: 20)
-                        .foregroundStyle(MwColor.textSecondary)
-                        .padding(.top, 1 * s)
-                }
-            }
-            .padding(.vertical, 13 * s)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            if !action.isChecked, let pill = DueText.pill(action.dueAt) {
-                MwStatusPill(Text(pill.key, bundle: .module), tone: pill.tone)
-            }
-        }
-        .padding(.horizontal, 18 * s)
-        .frame(minHeight: 56 * s)
-    }
-}
-
-/// 기한 문구: "오늘 17:30 · 17:00 알림"(마감 30분 전 알림), 시각이 없으면 원문 힌트.
-enum DueText {
-    static let alertLead: TimeInterval = 30 * 60
-
-    static func detail(_ action: ActionItem, calendar: Calendar = .current) -> String? {
-        guard let due = action.dueAt else { return action.dueHint }
-        let day: String = if calendar.isDateInToday(due) {
-            String(localized: "translate.due.today", bundle: .module)
-        } else if calendar.isDateInTomorrow(due) {
-            String(localized: "translate.due.tomorrow", bundle: .module)
-        } else {
-            due.formatted(.dateTime.month(.defaultDigits).day().weekday(.abbreviated).locale(Locale(identifier: "ko_KR")))
-        }
-        let time = due.mwClock
-        guard action.alertEnabled else { return "\(day) \(time)" }
-        let alert = due.addingTimeInterval(-alertLead).mwClock
-        return L("translate.due.withAlert", day, time, alert)
-    }
-
-    static func pill(_ due: Date?, now: Date = Date(), calendar: Calendar = .current) -> (key: LocalizedStringKey, tone: MwStatusPill.Tone)? {
-        guard let due else { return nil }
-        if due < now {
-            return ("translate.due.overdue", .urgent)
-        }
-        if calendar.isDateInToday(due) {
-            return ("translate.due.today", .urgent)
-        }
-        if calendar.isDateInTomorrow(due) {
-            return ("translate.due.tomorrow", .soon)
-        }
-        return nil
+        .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
+        .mwCardShadow(scale)
+        .padding(.horizontal, 20 * scale)
     }
 }

@@ -173,7 +173,14 @@ public struct UpcomingAction: Sendable, Equatable, Identifiable, Hashable {
         action.id
     }
 
-    public init(action: ActionItem, translationId: Int64, projectName: String, meetingTitle: String?, inputSource: InputSource?, createdAt: Date) {
+    public init(
+        action: ActionItem,
+        translationId: Int64,
+        projectName: String,
+        meetingTitle: String?,
+        inputSource: InputSource?,
+        createdAt: Date
+    ) {
         self.action = action
         self.translationId = translationId
         self.projectName = projectName
@@ -223,7 +230,16 @@ public struct ProjectSummary: Sendable, Equatable, Identifiable {
     public let unknownTermCount: Int
     public let isDefault: Bool
 
-    public init(id: Int64, name: String, description: String, translationCount: Int, openActionCount: Int, meetingCount: Int, unknownTermCount: Int, isDefault: Bool) {
+    public init(
+        id: Int64,
+        name: String,
+        description: String,
+        translationCount: Int,
+        openActionCount: Int,
+        meetingCount: Int,
+        unknownTermCount: Int,
+        isDefault: Bool
+    ) {
         self.id = id
         self.name = name
         self.description = description

@@ -47,7 +47,7 @@ public final class HomeViewModel {
         } catch {
             actions = .failed(code: "UNKNOWN")
         }
-        projectName = (try? await projects)?.first?.name
+        projectName = await (try? projects)?.first?.name
     }
 
     /// 체크 상자: 바로 바꿔 보여 주고(낙관적), 서버가 거절하면 되돌린다. 끝낸 할 일은 목록에 남겨 줄을 긋는다.
@@ -66,7 +66,7 @@ public final class HomeViewModel {
             guard var now = actions.value, let i = now.firstIndex(where: { $0.id == item.id }) else { return }
             now[i] = before
             actions = .loaded(now)
-            totalOpen += before.action.isChecked ? 1 : -1
+            totalOpen += before.action.isChecked ? -1 : 1
             notice = "home.actions.toggleFailed"
         }
     }
@@ -80,43 +80,6 @@ public final class HomeViewModel {
     }
 }
 
-// MARK: - 판교 등급(5단계, contracts/db.dbml levels · packages/test-vectors/level_table.json)
-
-public struct PangyoLevel: Equatable, Sendable {
-    public let number: Int
-    public let code: String
-    public let nameKey: String
-    public let minScore: Int
-    public let maxScore: Int
-
-    public static let all: [PangyoLevel] = [
-        PangyoLevel(number: 1, code: "OUTSIDER", nameKey: "level.outsider", minScore: 0, maxScore: 19),
-        PangyoLevel(number: 2, code: "TOURIST", nameKey: "level.tourist", minScore: 20, maxScore: 39),
-        PangyoLevel(number: 3, code: "SETTLER", nameKey: "level.settler", minScore: 40, maxScore: 64),
-        PangyoLevel(number: 4, code: "NATIVE", nameKey: "level.native", minScore: 65, maxScore: 84),
-        PangyoLevel(number: 5, code: "LOCAL", nameKey: "level.local", minScore: 85, maxScore: 100),
-    ]
-
-    /// 서버 등급 코드 → 등급. 진단 전(nil)이면 점수로 정한다.
-    public static func of(code: String?, score: Int) -> PangyoLevel {
-        if let code, let level = all.first(where: { $0.code == code }) {
-            return level
-        }
-        return all.last(where: { score >= $0.minScore }) ?? all[0]
-    }
-
-    /// 다음 등급까지 진행률(0~1). 마지막 등급이면 1.
-    public func progress(score: Int) -> Double {
-        guard number < Self.all.count else { return 1 }
-        let span = Double(maxScore - minScore + 1)
-        return min(max(Double(score - minScore) / span, 0), 1)
-    }
-
-    public var next: PangyoLevel? {
-        number < Self.all.count ? Self.all[number] : nil
-    }
-}
-
 // MARK: - 화면
 
 /// A-01 홈(Figma 51:1272). 히어로 300 위에 프로젝트 칩·등급 카드, 날짜·"오늘", 퇴근길 복습 카드, 다가오는 할 일.
@@ -127,9 +90,10 @@ public struct HomeRootView: View {
     let refreshKey: Int
 
     @Environment(AppRouter.self) private var router
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
-    public init(model: HomeViewModel, user: UserProfile?, refreshKey: Int = 0, onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }) {
+    public init(model: HomeViewModel, user: UserProfile?, refreshKey: Int = 0, onNotice: @escaping (LocalizedStringKey) -> Void = { _ in
+    }) {
         _model = State(initialValue: model)
         self.user = user
         self.refreshKey = refreshKey
@@ -141,14 +105,14 @@ public struct HomeRootView: View {
             ZStack(alignment: .top) {
                 MwHomeHero()
                 VStack(alignment: .leading, spacing: 0) {
-                    topBar.frame(height: 52 * s).padding(.top, 54 * s)
+                    topBar.frame(minHeight: 52 * scale).padding(.top, 54 * scale)
                     header
                     // 히어로 아래 카드: Figma 51:1328 pt 78(186 + 78 = 264)
-                    reviewCard.padding(.top, (264 - 186) * s)
-                    actionsSection.padding(.top, 24 * s)
+                    reviewCard.padding(.top, (264 - 186) * scale)
+                    actionsSection.padding(.top, 24 * scale)
                 }
             }
-            .padding(.bottom, MwTabBar<AppTab>.reservedHeight * s)
+            .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
         }
         .scrollIndicators(.hidden)
         .background(MwColor.canvas.ignoresSafeArea())
@@ -165,11 +129,11 @@ public struct HomeRootView: View {
 
     // 위: 프로젝트 칩(왼쪽 16) · 등급 카드(오른쪽 16)
     private var topBar: some View {
-        HStack(alignment: .top) {
+        HStack(alignment: .center) {
             Button {
                 router.select(.project)
             } label: {
-                HStack(spacing: 6 * s) {
+                HStack(spacing: 6 * scale) {
                     MwIconView(.layers, color: MwColor.accentFill)
                     Text(verbatim: model.projectName ?? String(localized: "home.project.default", bundle: .module))
                         .mwFont(.bold, 13)
@@ -177,53 +141,57 @@ public struct HomeRootView: View {
                         .lineLimit(1)
                     MwIconView(.chevronDown, color: MwColor.textPrimary.opacity(0.6))
                 }
-                .padding(.horizontal, 14 * s)
-                .frame(height: 36 * s)
+                .padding(.horizontal, 14 * scale)
+                .frame(minHeight: 36 * scale)
                 .background(MwGlassBackground(cornerRadius: 18, fill: MwColor.glassFillThin.opacity(0.7)))
-                .mwGlassShadow(s)
+                .mwGlassShadow(scale)
             }
             .buttonStyle(.plain)
-            Spacer(minLength: 8 * s)
+            Spacer(minLength: 8 * scale)
             levelCard
         }
-        .padding(.horizontal, 16 * s)
+        .padding(.horizontal, 16 * scale)
     }
 
     private var levelCard: some View {
         let score = user?.bestScore ?? 0
         let level = PangyoLevel.of(code: user?.levelCode, score: score)
         let progress = level.progress(score: score)
-        return VStack(alignment: .leading, spacing: 4 * s) {
+        return VStack(alignment: .leading, spacing: 4 * scale) {
             HStack {
                 Text(verbatim: "Lv\(level.number)")
-                    .font(MwFont.pretendard(.bold, size: 11 * s))
+                    .font(MwFont.pretendard(.bold, size: 11 * scale))
                     .foregroundStyle(MwColor.jargonChipText)
-                    .padding(.horizontal, 7 * s)
-                    .frame(height: 20 * s)
-                    .background(RoundedRectangle(cornerRadius: 9 * s, style: .circular).fill(MwColor.jargonChipFill))
-                Spacer(minLength: 6 * s)
+                    .padding(.horizontal, 7 * scale)
+                    .frame(minHeight: 20 * scale)
+                    .background(RoundedRectangle(cornerRadius: 9 * scale, style: .circular).fill(MwColor.jargonChipFill))
+                Spacer(minLength: 6 * scale)
                 Text(LocalizedStringKey(level.nameKey), bundle: .module)
                     .mwFont(.bold, 13, lineHeight: 19)
                     .foregroundStyle(MwColor.textPrimary)
             }
             ZStack(alignment: .leading) {
-                RoundedRectangle(cornerRadius: 3 * s).fill(MwColor.separator)
-                RoundedRectangle(cornerRadius: 3 * s).fill(MwColor.accentFill).frame(width: 90 * s * progress)
+                RoundedRectangle(cornerRadius: 3 * scale).fill(MwColor.separator)
+                RoundedRectangle(cornerRadius: 3 * scale).fill(MwColor.accentFill).frame(width: 90 * scale * progress)
             }
-            .frame(width: 90 * s, height: 4 * s)
+            .frame(width: 90 * scale, height: 4 * scale)
             if let next = level.next {
-                Text(verbatim: L("home.level.toNext", String(localized: String.LocalizationValue(next.nameKey), bundle: .module), Int(progress * 100)))
-                    .font(MwFont.pretendard(.regular, size: 10 * s))
-                    .foregroundStyle(MwColor.textSecondary)
+                Text(verbatim: fmt(
+                    "home.level.toNext",
+                    String(localized: String.LocalizationValue(next.nameKey), bundle: .module),
+                    Int(progress * 100)
+                ))
+                .font(MwFont.pretendard(.regular, size: 10 * scale))
+                .foregroundStyle(MwColor.textSecondary)
             }
         }
-        .padding(.horizontal, 10 * s)
-        .padding(.top, 6 * s)
-        .padding(.bottom, 7 * s)
-        .frame(minWidth: 112 * s, alignment: .leading)
+        .padding(.horizontal, 10 * scale)
+        .padding(.top, 6 * scale)
+        .padding(.bottom, 7 * scale)
+        .frame(minWidth: 112 * scale, alignment: .leading)
         .fixedSize()
         .background(MwGlassBackground(cornerRadius: 16))
-        .mwGlassShadow(s)
+        .mwGlassShadow(scale)
         .accessibilityElement(children: .combine)
     }
 
@@ -231,18 +199,18 @@ public struct HomeRootView: View {
         VStack(alignment: .leading, spacing: 0) {
             Text(verbatim: Date().formatted(.dateTime.month(.wide).day().weekday(.wide).locale(Locale(identifier: "ko_KR"))))
                 .mwFont(.bold, 14, lineHeight: 20, tracking: -0.07)
-                .foregroundStyle(MwColor.textStrong)
+                .foregroundStyle(MwColor.onHeroStrong)
             Text("home.today", bundle: .module)
                 .mwFont(.bold, 34, lineHeight: 44, tracking: -0.68)
-                .foregroundStyle(MwColor.textPrimary)
+                .foregroundStyle(MwColor.onHeroPrimary)
                 .accessibilityAddTraits(.isHeader)
         }
-        .padding(.horizontal, 20 * s)
-        .padding(.top, 4 * s)
-        .padding(.bottom, 12 * s)
+        .padding(.horizontal, 20 * scale)
+        .padding(.top, 4 * scale)
+        .padding(.bottom, 12 * scale)
     }
 
-    // 퇴근길 복습 카드(Figma 51:1329). 복습은 v1.1 → 장 수 0, 버튼은 안내.
+    /// 퇴근길 복습 카드(Figma 51:1329). 복습은 v1.1 → 장 수 0, 버튼은 안내.
     private var reviewCard: some View {
         VStack(alignment: .leading, spacing: 0) {
             HStack {
@@ -254,44 +222,45 @@ public struct HomeRootView: View {
                 Text(verbatim: Self.reminderText(hour: 18)).mwFont(.regular, 12, lineHeight: 16).foregroundStyle(MwColor.textSecondary)
             }
             HStack(alignment: .lastTextBaseline) {
-                (Text(verbatim: "0").font(MwFont.pretendard(.bold, size: 34 * s)).foregroundStyle(MwColor.textPrimary)
-                    + Text("home.review.unit", bundle: .module).font(MwFont.pretendard(.semiBold, size: 17 * s)).foregroundStyle(MwColor.textSecondary))
-                    .tracking(-0.68 * s)
+                (Text(verbatim: "0").font(MwFont.pretendard(.bold, size: 34 * scale)).foregroundStyle(MwColor.textPrimary)
+                    + Text("home.review.unit", bundle: .module).font(MwFont.pretendard(.semiBold, size: 17 * scale))
+                    .foregroundStyle(MwColor.textSecondary))
+                    .tracking(-0.68 * scale)
                 Spacer()
                 HStack(spacing: 0) {
-                    MwIconView(.flame).frame(width: 10.891 * s, height: 14 * s)
-                    Text(verbatim: L("home.review.streak", user?.currentStreak ?? 0))
+                    MwIconView(.flame).frame(width: 10.891 * scale, height: 14 * scale)
+                    Text(verbatim: fmt("home.review.streak", user?.currentStreak ?? 0))
                         .mwFont(.regular, 13, lineHeight: 19)
                         .foregroundStyle(MwColor.textSecondary)
                 }
             }
-            .frame(height: 52 * s, alignment: .bottom)
+            .frame(minHeight: 52 * scale, alignment: .bottom)
             Button {
                 onNotice("home.review.comingSoon")
             } label: {
-                Text("home.review.start", bundle: .module).font(MwFont.pretendard(.semiBold, size: 17 * s))
+                Text("home.review.start", bundle: .module).font(MwFont.pretendard(.semiBold, size: 17 * scale))
             }
             .buttonStyle(MwPrimaryButtonStyle(height: 50, radius: 18))
-            .padding(.top, 12 * s)
+            .padding(.top, 12 * scale)
         }
-        .padding(18 * s)
+        .padding(18 * scale)
         .background(MwGlassBackground(cornerRadius: 26))
-        .mwGlassShadow(s)
-        .padding(.horizontal, 20 * s)
+        .mwGlassShadow(scale)
+        .padding(.horizontal, 20 * scale)
     }
 
     static func reminderText(hour: Int) -> String {
-        var c = DateComponents()
-        c.year = 2026
-        c.month = 1
-        c.day = 1
-        c.hour = hour
-        c.minute = 0
-        let date = Calendar(identifier: .gregorian).date(from: c) ?? Date()
+        var comps = DateComponents()
+        comps.year = 2026
+        comps.month = 1
+        comps.day = 1
+        comps.hour = hour
+        comps.minute = 0
+        let date = Calendar(identifier: .gregorian).date(from: comps) ?? Date()
         return date.formatted(.dateTime.hour().minute().locale(Locale(identifier: "ko_KR")))
     }
 
-    // 다가오는 할 일(Figma 51:1353).
+    /// 다가오는 할 일(Figma 51:1353).
     private var actionsSection: some View {
         VStack(alignment: .leading, spacing: 0) {
             MwSectionHeader(Text("home.actions.title", bundle: .module)) {
@@ -299,7 +268,7 @@ public struct HomeRootView: View {
                     Button {
                         router.select(.project)
                     } label: {
-                        Text(verbatim: L("home.actions.all", model.totalOpen))
+                        Text(verbatim: fmt("home.actions.all", model.totalOpen))
                             .mwFont(.semiBold, 13, lineHeight: 19)
                             .foregroundStyle(MwColor.accentFill)
                     }
@@ -308,7 +277,7 @@ public struct HomeRootView: View {
             }
             switch model.actions {
             case .idle, .loading:
-                ProgressView().frame(maxWidth: .infinity, minHeight: 120 * s)
+                ProgressView().frame(maxWidth: .infinity, minHeight: 120 * scale)
             case let .failed(code):
                 failure(code)
             case let .loaded(items) where items.isEmpty:
@@ -322,16 +291,16 @@ public struct HomeRootView: View {
                         ActionRow(item: item) { Task { await model.toggle(item) } }
                     }
                 }
-                .background(RoundedRectangle(cornerRadius: 20 * s, style: .circular).fill(MwColor.surface))
-                .clipShape(RoundedRectangle(cornerRadius: 20 * s, style: .circular))
-                .mwCardShadow(s)
+                .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
+                .clipShape(RoundedRectangle(cornerRadius: 20 * scale, style: .circular))
+                .mwCardShadow(scale)
             }
         }
-        .padding(.horizontal, 20 * s)
+        .padding(.horizontal, 20 * scale)
     }
 
     private var emptyActions: some View {
-        VStack(spacing: 12 * s) {
+        VStack(spacing: 12 * scale) {
             Text("home.actions.empty", bundle: .module)
                 .mwFont(.regular, 15, lineHeight: 22)
                 .foregroundStyle(MwColor.textSecondary)
@@ -339,21 +308,21 @@ public struct HomeRootView: View {
             Button {
                 router.present(.compose)
             } label: {
-                HStack(spacing: 8 * s) {
+                HStack(spacing: 8 * scale) {
                     MwIconView(.sparkles, color: MwColor.accentFill)
-                    Text("home.actions.decode", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * s))
+                    Text("home.actions.decode", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * scale))
                 }
             }
             .buttonStyle(MwSecondaryButtonStyle(height: 48))
         }
-        .padding(18 * s)
+        .padding(18 * scale)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 20 * s, style: .circular).fill(MwColor.surface))
-        .mwCardShadow(s)
+        .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
+        .mwCardShadow(scale)
     }
 
     private func failure(_ code: String) -> some View {
-        VStack(spacing: 10 * s) {
+        VStack(spacing: 10 * scale) {
             Text(code == "OFFLINE" ? "home.error.offline" : "home.error.generic", bundle: .module)
                 .mwFont(.regular, 15, lineHeight: 22)
                 .foregroundStyle(MwColor.textSecondary)
@@ -361,82 +330,14 @@ public struct HomeRootView: View {
             Button {
                 Task { await model.load() }
             } label: {
-                Text("home.error.retry", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * s))
+                Text("home.error.retry", bundle: .module).font(MwFont.pretendard(.semiBold, size: 16 * scale))
             }
             .buttonStyle(MwSecondaryButtonStyle(height: 44))
         }
-        .padding(18 * s)
+        .padding(18 * scale)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 20 * s, style: .circular).fill(MwColor.surface))
-        .mwCardShadow(s)
-    }
-}
-
-/// 할 일 한 줄(Figma 51:1361): 체크 26 · 제목 17 Medium · 출처 칩 + 시각 · 오른쪽 기한 알약.
-struct ActionRow: View {
-    let item: UpcomingAction
-    let onToggle: () -> Void
-    @Environment(\.mwScale) private var s
-
-    var body: some View {
-        HStack(spacing: 14 * s) {
-            Button(action: onToggle) {
-                MwCheckbox(isOn: item.action.isChecked)
-            }
-            .buttonStyle(.plain)
-            .frame(width: 26 * s, height: 56 * s)
-            .contentShape(Rectangle().inset(by: -9 * s))
-            .accessibilityLabel(Text(verbatim: item.action.text))
-            .accessibilityValue(Text(item.action.isChecked ? "home.actions.done" : "home.actions.notDone", bundle: .module))
-            .accessibilityAddTraits(.isToggle)
-            VStack(alignment: .leading, spacing: 0) {
-                Text(verbatim: item.action.text)
-                    .mwFont(.medium, 17, lineHeight: 24)
-                    .foregroundStyle(item.action.isChecked ? MwColor.textDisabled : MwColor.textPrimary)
-                    .strikethrough(item.action.isChecked, color: MwColor.textDisabled)
-                    .fixedSize(horizontal: false, vertical: true)
-                HStack(spacing: 6 * s) {
-                    MwSourceChip(
-                        icon: item.meetingTitle == nil ? .clip : .meeting,
-                        Text(verbatim: item.meetingTitle ?? String(localized: "home.actions.source.message", bundle: .module))
-                    )
-                    Text(verbatim: item.createdAt.mwClock)
-                        .mwFont(.regular, 14, lineHeight: 20)
-                        .foregroundStyle(MwColor.textSecondary)
-                }
-                .padding(.top, 1 * s)
-            }
-            .padding(.vertical, 13 * s)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .accessibilityElement(children: .combine)
-            if !item.action.isChecked, let due = DueBadge(dueAt: item.action.dueAt) {
-                MwStatusPill(Text(due.key, bundle: .module), tone: due.tone)
-            }
-        }
-        .padding(.horizontal, 18 * s)
-        .frame(minHeight: 56 * s)
-    }
-}
-
-/// 기한 → 알약(지남·오늘·내일).
-struct DueBadge {
-    let key: LocalizedStringKey
-    let tone: MwStatusPill.Tone
-
-    init?(dueAt: Date?, now: Date = Date(), calendar: Calendar = .current) {
-        guard let dueAt else { return nil }
-        if dueAt < now {
-            key = "home.due.overdue"
-            tone = .urgent
-        } else if calendar.isDateInToday(dueAt) {
-            key = "home.due.today"
-            tone = .urgent
-        } else if calendar.isDateInTomorrow(dueAt) {
-            key = "home.due.tomorrow"
-            tone = .soon
-        } else {
-            return nil
-        }
+        .background(RoundedRectangle(cornerRadius: 20 * scale, style: .circular).fill(MwColor.surface))
+        .mwCardShadow(scale)
     }
 }
 
@@ -451,6 +352,6 @@ struct DueBadge {
 #endif
 
 /// 카탈로그 문구 + 값(키는 점 표기만 쓴다 → 값은 %lld·%@ 자리표시자로 넣는다, check-xcstrings).
-func L(_ key: String, _ args: CVarArg...) -> String {
+func fmt(_ key: String, _ args: CVarArg...) -> String {
     String(format: String(localized: String.LocalizationValue(key), bundle: .module), arguments: args)
 }

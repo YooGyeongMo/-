@@ -10,16 +10,16 @@ import SwiftUI
 public struct ComposeSheet: View {
     @State private var model: ComposeViewModel
     let aiConsent: Bool
-    let onResult: (Translation) -> Void
+    let onResult: (Domain.Translation) -> Void
     let onNotice: (LocalizedStringKey) -> Void
     @Environment(AppRouter.self) private var router
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
     @FocusState private var focused: Bool
 
     public init(
         dependencies: TranslateDependencies,
         aiConsent: Bool,
-        onResult: @escaping (Translation) -> Void,
+        onResult: @escaping (Domain.Translation) -> Void,
         onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }
     ) {
         _model = State(initialValue: ComposeViewModel(dependencies: dependencies))
@@ -29,8 +29,25 @@ public struct ComposeSheet: View {
     }
 
     public var body: some View {
+        // 키보드가 올라와도 버튼·안내가 가려지지 않게 스크롤, 끌면 키보드가 내려간다(QA H3).
+        ScrollView {
+            sheetContent
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .scrollBounceBehavior(.basedOnSize)
+        .background(MwColor.canvas.ignoresSafeArea())
+        .onAppear { focused = true }
+        .onDisappear { model.cancel() }
+        .onChange(of: model.state) { _, state in
+            if case let .failed(reason) = state {
+                AccessibilityNotification.Announcement(Self.message(reason)).post()
+            }
+        }
+    }
+
+    private var sheetContent: some View {
         VStack(alignment: .leading, spacing: 0) {
-            MwGrabber().frame(maxWidth: .infinity).padding(.top, 10 * s)
+            MwGrabber().frame(maxWidth: .infinity).padding(.top, 10 * scale)
             HStack {
                 modePicker
                 Spacer()
@@ -39,28 +56,25 @@ public struct ComposeSheet: View {
                     router.dismissSheet()
                 }
             }
-            .padding(.top, 14 * s)
+            .padding(.top, 14 * scale)
             Text("translate.compose.title", bundle: .module)
                 .mwFont(.bold, 22, lineHeight: 31, tracking: -0.33)
                 .foregroundStyle(MwColor.textPrimary)
-                .padding(.top, 12 * s)
+                .padding(.top, 12 * scale)
                 .accessibilityAddTraits(.isHeader)
-            editorCard.padding(.top, 16 * s)
+            consentHint.padding(.top, 8 * scale)
+            editorCard.padding(.top, 16 * scale)
             if case let .failed(reason) = model.state {
                 Label { Text(Self.message(reason)) } icon: { Image(systemName: "exclamationmark.circle") }
                     .mwFont(.regular, 13, lineHeight: 19)
                     .foregroundStyle(MwColor.urgentText)
-                    .padding(.top, 10 * s)
+                    .padding(.top, 10 * scale)
                     .accessibilityAddTraits(.updatesFrequently)
                     .accessibilityIdentifier("compose.error")
             }
-            consentHint.padding(.top, 12 * s)
-            Spacer(minLength: 0)
         }
-        .padding(.horizontal, 20 * s)
-        .background(MwColor.canvas.ignoresSafeArea())
-        .onAppear { focused = true }
-        .onDisappear { model.cancel() }
+        .padding(.horizontal, 20 * scale)
+        .padding(.bottom, 24 * scale)
     }
 
     private var modePicker: some View {
@@ -70,23 +84,23 @@ public struct ComposeSheet: View {
                 onNotice("translate.compose.captureComingSoon")
             }
         }
-        .padding(4 * s)
-        .background(RoundedRectangle(cornerRadius: 14 * s, style: .circular).fill(MwColor.chipFill))
+        .padding(4 * scale)
+        .background(RoundedRectangle(cornerRadius: 14 * scale, style: .circular).fill(MwColor.chipFill))
     }
 
     private func modeItem(icon: MwIcon?, _ title: Text, selected: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 6 * s) {
+            HStack(spacing: 6 * scale) {
                 if let icon {
                     MwIconView(icon, color: selected ? MwColor.textPrimary : MwColor.textSecondary)
                 }
                 title.mwFont(.bold, 13).foregroundStyle(selected ? MwColor.textPrimary : MwColor.textSecondary)
             }
-            .padding(.horizontal, 14 * s)
-            .frame(height: 32 * s)
+            .padding(.horizontal, 14 * scale)
+            .frame(minHeight: 32 * scale)
             .background {
                 if selected {
-                    RoundedRectangle(cornerRadius: 10 * s, style: .circular).fill(MwColor.surface).mwCardShadow(s)
+                    RoundedRectangle(cornerRadius: 10 * scale, style: .circular).fill(MwColor.surface).mwCardShadow(scale)
                 }
             }
         }
@@ -96,7 +110,7 @@ public struct ComposeSheet: View {
 
     private var editorCard: some View {
         VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 6 * s) {
+            HStack(spacing: 6 * scale) {
                 MwSourceChip(icon: .clip, Text("translate.compose.sourceChip", bundle: .module))
                 Spacer()
                 if model.text.isEmpty {
@@ -122,34 +136,35 @@ public struct ComposeSheet: View {
                 }
                 TextEditor(text: $model.text)
                     .focused($focused)
-                    .font(MwFont.pretendard(.regular, size: 17 * s))
-                    .lineSpacing((26 - 17 * MwTextStyle.naturalLineHeight) * s)
+                    .font(MwFont.pretendard(.regular, size: 17 * scale))
+                    .lineSpacing((26 - 17 * MwTextStyle.naturalLineHeight) * scale)
                     .foregroundStyle(MwColor.textPrimary)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: 140 * s, maxHeight: 260 * s)
+                    .frame(minHeight: 140 * scale, maxHeight: 260 * scale)
                     .onChange(of: model.text) { _, _ in model.clearError() }
                     .accessibilityLabel(Text("translate.compose.placeholder", bundle: .module))
                     .accessibilityIdentifier("compose.editor")
             }
-            .padding(.top, 10 * s)
-            Rectangle().fill(MwColor.separator).frame(height: 1).padding(.top, 12 * s)
-            HStack(spacing: 8 * s) {
-                HStack(spacing: 4 * s) {
-                    Image(systemName: "arrow.left.arrow.right").font(.system(size: 11 * s, weight: .bold))
+            .padding(.top, 10 * scale)
+            // swiftlint:disable:next no_fixed_height - 1pt 구분선·빛 줄(글자 없음)
+            Rectangle().fill(MwColor.separator).frame(height: 1).padding(.top, 12 * scale)
+            HStack(spacing: 8 * scale) {
+                HStack(spacing: 4 * scale) {
+                    Image(systemName: "arrow.left.arrow.right").font(.system(size: 11 * scale, weight: .bold))
                     Text("translate.compose.direction", bundle: .module).mwFont(.bold, 12)
                 }
                 .foregroundStyle(MwColor.accentFill)
-                .padding(.horizontal, 8 * s)
-                .frame(height: 26 * s)
-                .background(RoundedRectangle(cornerRadius: 7 * s, style: .circular).fill(MwColor.accentSoftFill))
+                .padding(.horizontal, 8 * scale)
+                .frame(minHeight: 26 * scale)
+                .background(RoundedRectangle(cornerRadius: 7 * scale, style: .circular).fill(MwColor.accentSoftFill))
                 Spacer()
                 Text(verbatim: "\(model.length) / \(TranslateUseCase.maxLength)")
                     .mwFont(.regular, 13)
                     .foregroundStyle(model.length > TranslateUseCase.maxLength ? MwColor.urgentText : MwColor.textSecondary)
                     .monospacedDigit()
-                    .accessibilityLabel(Text(verbatim: L("translate.compose.count", model.length, TranslateUseCase.maxLength)))
+                    .accessibilityLabel(Text(verbatim: fmt("translate.compose.count", model.length, TranslateUseCase.maxLength)))
             }
-            .padding(.top, 12 * s)
+            .padding(.top, 12 * scale)
             Button {
                 Task {
                     if let result = await model.submit() {
@@ -157,7 +172,7 @@ public struct ComposeSheet: View {
                     }
                 }
             } label: {
-                HStack(spacing: 8 * s) {
+                HStack(spacing: 8 * scale) {
                     if model.state == .translating {
                         ProgressView().tint(MwColor.accentOnFill)
                         Text("translate.compose.submitting", bundle: .module)
@@ -166,27 +181,29 @@ public struct ComposeSheet: View {
                         Text("translate.compose.submit", bundle: .module)
                     }
                 }
-                .font(MwFont.pretendard(.semiBold, size: 17 * s))
+                .font(MwFont.pretendard(.semiBold, size: 17 * scale))
             }
             .buttonStyle(MwPrimaryButtonStyle(height: 52, radius: 18))
             .disabled(!model.canSubmit)
-            .padding(.top, 14 * s)
+            .padding(.top, 14 * scale)
             .accessibilityIdentifier("compose.submit")
         }
-        .padding(.horizontal, 18 * s)
-        .padding(.vertical, 16 * s)
-        .background(RoundedRectangle(cornerRadius: 24 * s, style: .circular).fill(MwColor.surface))
-        .overlay(RoundedRectangle(cornerRadius: 24 * s, style: .circular).strokeBorder(MwColor.accentFill, lineWidth: 1))
-        .mwRaisedShadow(s)
+        .padding(.horizontal, 18 * scale)
+        .padding(.vertical, 16 * scale)
+        .background(RoundedRectangle(cornerRadius: 24 * scale, style: .circular).fill(MwColor.surface))
+        .overlay(RoundedRectangle(cornerRadius: 24 * scale, style: .circular).strokeBorder(MwColor.accentFill, lineWidth: 1))
+        .mwRaisedShadow(scale)
     }
 
     @ViewBuilder private var consentHint: some View {
         if !aiConsent {
             Button {
-                model.cancel()
                 router.present(.settings)
             } label: {
-                (Text("translate.compose.consentOff", bundle: .module) + Text(verbatim: " ") + Text("translate.compose.consentLink", bundle: .module).underline())
+                (Text("translate.compose.consentOff", bundle: .module) + Text(verbatim: " ") + Text(
+                    "translate.compose.consentLink",
+                    bundle: .module
+                ).underline())
                     .mwFont(.regular, 13, lineHeight: 19)
                     .foregroundStyle(MwColor.textSecondary)
                     .multilineTextAlignment(.leading)
@@ -202,7 +219,7 @@ public struct ComposeSheet: View {
         case .offline: String(localized: "translate.compose.error.offline", bundle: .module)
         case let .busy(seconds):
             if let seconds, seconds > 0 {
-                L("translate.compose.error.busySeconds", seconds)
+                fmt("translate.compose.error.busySeconds", seconds)
             } else {
                 String(localized: "translate.compose.error.busy", bundle: .module)
             }

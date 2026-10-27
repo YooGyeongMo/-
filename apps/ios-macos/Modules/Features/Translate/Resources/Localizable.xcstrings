@@ -52,6 +52,23 @@
         }
       }
     },
+    "translate.card.date": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld월 %2$lld일 (%3$@)"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%1$lld/%2$lld (%3$@)"
+          }
+        }
+      }
+    },
     "translate.card.jargon": {
       "extractionState": "manual",
       "localizations": {
@@ -109,13 +126,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "캡처로 해석하기는 12월 업데이트에서 열려요."
+            "value": "캡처로 해석하기는 다음 업데이트에서 열려요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Screenshot decoding arrives in the December update."
+            "value": "Screenshot decoding is coming in the next update."
           }
         }
       }
@@ -704,13 +721,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "회의 녹음은 12월 말 업데이트에서 열려요."
+            "value": "회의 녹음은 다음 업데이트에서 열려요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Meeting recording arrives in late December."
+            "value": "Meeting recording is coming in a later update."
           }
         }
       }
@@ -766,6 +783,23 @@
         }
       }
     },
+    "translate.project.openResult": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "해석 결과 열기"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Open result"
+          }
+        }
+      }
+    },
     "translate.project.tab.actions": {
       "extractionState": "manual",
       "localizations": {
@@ -812,7 +846,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Decodes %lld"
+            "value": "Decoded %lld"
           }
         }
       }
@@ -823,13 +857,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "모르는 말 모아 보기는 12월 업데이트에서 열려요.\n지금은 해석 결과에서 용어를 눌러 뜻을 볼 수 있어요."
+            "value": "모르는 말 모아 보기는 다음 업데이트에서 열려요.\n지금은 해석 결과에서 용어를 눌러 뜻을 볼 수 있어요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "The term list arrives in the December update.\nFor now, tap a term in a result to see its meaning."
+            "value": "The term list is coming in the next update.\nFor now, tap a term in a result to see its meaning."
           }
         }
       }
@@ -846,7 +880,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Asked of me"
+            "value": "Your tasks"
           }
         }
       }
@@ -874,13 +908,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "복습 카드는 12월 업데이트에서 열려요."
+            "value": "복습 카드는 다음 업데이트에서 열려요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Review cards arrive in the December update."
+            "value": "Review cards are coming in the next update."
           }
         }
       }
@@ -993,13 +1027,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "사전에 없는 새 말이에요. 뜻은 AI 해석으로만 보여 드려요."
+            "value": "아직 사전에 없는 말이에요. 뜻은 위 쉬운 말 풀이를 참고해 주세요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "A new term not in the dictionary yet. Only the AI meaning is available."
+            "value": "Not in the dictionary yet. See the plain-words version above."
           }
         }
       }
@@ -1084,7 +1118,7 @@
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Basic"
+            "value": "Dictionary only"
           }
         }
       }

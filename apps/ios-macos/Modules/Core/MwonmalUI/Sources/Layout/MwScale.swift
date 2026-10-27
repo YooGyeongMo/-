@@ -51,13 +51,13 @@ public struct MwTextStyle: ViewModifier {
     public static let naturalLineHeight: CGFloat = 1.193
 
     public func body(content: Content) -> some View {
-        let k = scale * typeScale
+        let factor = scale * typeScale
         let leading = max((lineHeight ?? size * Self.naturalLineHeight) - size * Self.naturalLineHeight, 0)
         content
-            .font(MwFont.pretendard(weight, size: size * k))
-            .tracking(tracking * k)
-            .lineSpacing(leading * k)
-            .padding(.vertical, leading * k / 2)
+            .font(MwFont.pretendard(weight, size: size * factor))
+            .tracking(tracking * factor)
+            .lineSpacing(leading * factor)
+            .padding(.vertical, leading * factor / 2)
     }
 }
 
@@ -78,7 +78,7 @@ public extension CGFloat {
 public extension Date {
     /// Figma 시각 표기 "17:30"(24시간제). 한국어 로캘의 기본 시각 형식은 12시간제라 따로 둔다.
     var mwClock: String {
-        let c = Calendar.current.dateComponents([.hour, .minute], from: self)
-        return String(format: "%02d:%02d", c.hour ?? 0, c.minute ?? 0)
+        let parts = Calendar.current.dateComponents([.hour, .minute], from: self)
+        return String(format: "%02d:%02d", parts.hour ?? 0, parts.minute ?? 0)
     }
 }

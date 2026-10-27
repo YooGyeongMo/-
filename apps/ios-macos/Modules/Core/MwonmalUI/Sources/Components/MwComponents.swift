@@ -53,8 +53,8 @@ public enum MwIcon: String, CaseIterable, Sendable {
 public struct MwIconView: View {
     let icon: MwIcon
     let color: Color?
-    @Environment(\.mwScale) private var s
-    @ScaledMetric(relativeTo: .body) private var t: CGFloat = 1
+    @Environment(\.mwScale) private var scale
+    @ScaledMetric(relativeTo: .body) private var typeScale: CGFloat = 1
 
     public init(_ icon: MwIcon, color: Color? = nil) {
         self.icon = icon
@@ -62,7 +62,7 @@ public struct MwIconView: View {
     }
 
     public var body: some View {
-        let k = s * min(t, 1.6)
+        let factor = scale * min(typeScale, 1.6)
         Group {
             if let color {
                 icon.image.resizable().foregroundStyle(color)
@@ -70,7 +70,7 @@ public struct MwIconView: View {
                 icon.image.resizable()
             }
         }
-        .frame(width: icon.size.width * k, height: icon.size.height * k)
+        .frame(width: icon.size.width * factor, height: icon.size.height * factor)
         .accessibilityHidden(true)
     }
 }
@@ -79,20 +79,20 @@ public struct MwIconView: View {
 
 public extension View {
     /// 흰 카드(Figma: 0 1 0 rgba(90,60,30,.04), 0 2 6 rgba(90,60,30,.06)).
-    func mwCardShadow(_ s: CGFloat) -> some View {
-        shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.04), radius: 0, y: 1 * s)
-            .shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.06), radius: 3 * s, y: 2 * s)
+    func mwCardShadow(_ scale: CGFloat) -> some View {
+        shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.04), radius: 0, y: 1 * scale)
+            .shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.06), radius: 3 * scale, y: 2 * scale)
     }
 
     /// 떠 있는 카드(Figma drop-shadow: 0 1 0 rgba(90,60,30,.05), 0 6 8 rgba(90,60,30,.09)).
-    func mwRaisedShadow(_ s: CGFloat) -> some View {
-        shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.05), radius: 0, y: 1 * s)
-            .shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.09), radius: 4 * s, y: 6 * s)
+    func mwRaisedShadow(_ scale: CGFloat) -> some View {
+        shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.05), radius: 0, y: 1 * scale)
+            .shadow(color: Color(red: 90 / 255, green: 60 / 255, blue: 30 / 255).opacity(0.09), radius: 4 * scale, y: 6 * scale)
     }
 
     /// 유리 패널 그림자(Figma: 0 10 30 rgba(60,50,20,.14)).
-    func mwGlassShadow(_ s: CGFloat, y: CGFloat = 10, blur: CGFloat = 30, opacity: Double = 0.14) -> some View {
-        shadow(color: Color(red: 60 / 255, green: 50 / 255, blue: 20 / 255).opacity(opacity), radius: blur / 2 * s, y: y * s)
+    func mwGlassShadow(_ scale: CGFloat, y offsetY: CGFloat = 10, blur: CGFloat = 30, opacity: Double = 0.14) -> some View {
+        shadow(color: Color(red: 60 / 255, green: 50 / 255, blue: 20 / 255).opacity(opacity), radius: blur / 2 * scale, y: offsetY * scale)
     }
 }
 
@@ -100,7 +100,7 @@ public extension View {
 public struct MwGlassBackground: View {
     let cornerRadius: CGFloat
     let fill: Color
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
     @Environment(\.accessibilityReduceTransparency) private var reduceTransparency
 
     public init(cornerRadius: CGFloat, fill: Color = MwColor.glassFill) {
@@ -109,7 +109,7 @@ public struct MwGlassBackground: View {
     }
 
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: cornerRadius * s, style: .circular)
+        let shape = RoundedRectangle(cornerRadius: cornerRadius * scale, style: .circular)
         ZStack {
             if reduceTransparency {
                 shape.fill(MwColor.surface)
@@ -120,7 +120,8 @@ public struct MwGlassBackground: View {
             shape.strokeBorder(MwColor.glassBorder, lineWidth: 1)
             // inset 0 1 0 rgba(255,255,255,.85): 위쪽 1pt 빛
             shape.strokeBorder(Color.white.opacity(0.85), lineWidth: 1)
-                .mask(alignment: .top) { Rectangle().frame(height: 1.5 * s) }
+                // swiftlint:disable:next no_fixed_height - 1pt 구분선·빛 줄(글자 없음)
+                .mask(alignment: .top) { Rectangle().frame(height: 1.5 * scale) }
         }
     }
 }
@@ -132,7 +133,7 @@ public struct MwGlassCircleButton: View {
     let label: LocalizedStringKey
     let bundle: Bundle?
     let action: () -> Void
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(_ icon: MwIcon, diameter: CGFloat = 44, label: LocalizedStringKey, bundle: Bundle? = nil, action: @escaping () -> Void) {
         self.icon = icon
@@ -145,13 +146,14 @@ public struct MwGlassCircleButton: View {
     public var body: some View {
         Button(action: action) {
             MwIconView(icon, color: MwColor.textPrimary)
-                .frame(width: diameter * s, height: diameter * s)
+                .frame(width: diameter * scale, height: diameter * scale)
                 .background(MwGlassBackground(cornerRadius: diameter / 2, fill: MwColor.glassFillThin))
-                .mwGlassShadow(s, y: 4, blur: 14, opacity: 0.1)
+                .mwGlassShadow(scale, y: 4, blur: 14, opacity: 0.1)
                 .contentShape(Circle())
         }
         .buttonStyle(.plain)
-        .frame(minWidth: 44, minHeight: 44)
+        // 그림 크기는 Figma 그대로(32·44), 누르는 범위만 44pt 이상으로 넓힌다(레이아웃은 밀지 않는다).
+        .contentShape(Rectangle().inset(by: -max(0, (44 - diameter * scale) / 2)))
         .accessibilityLabel(Text(label, bundle: bundle))
     }
 }
@@ -162,7 +164,7 @@ public struct MwGlassCircleButton: View {
 public struct MwPrimaryButtonStyle: ButtonStyle {
     let height: CGFloat
     let radius: CGFloat
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
     @Environment(\.isEnabled) private var isEnabled
 
     public init(height: CGFloat = 56, radius: CGFloat = 18) {
@@ -171,15 +173,15 @@ public struct MwPrimaryButtonStyle: ButtonStyle {
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: radius * s, style: .circular)
+        let shape = RoundedRectangle(cornerRadius: radius * scale, style: .circular)
         configuration.label
             .foregroundStyle(MwColor.accentOnFill)
-            .frame(maxWidth: .infinity, minHeight: height * s)
+            .frame(maxWidth: .infinity, minHeight: height * scale)
             .background(shape.fill(MwColor.accentFill))
-            .background(shape.fill(MwColor.accentShadow).offset(y: 2 * s))
-            .shadow(color: Color(red: 47 / 255, green: 111 / 255, blue: 214 / 255).opacity(0.28), radius: 9 * s, y: 8 * s)
+            .background(shape.fill(MwColor.accentShadow).offset(y: 2 * scale))
+            .shadow(color: Color(red: 47 / 255, green: 111 / 255, blue: 214 / 255).opacity(0.28), radius: 9 * scale, y: 8 * scale)
             .opacity(isEnabled ? (configuration.isPressed ? 0.85 : 1) : 0.45)
-            .offset(y: configuration.isPressed ? 1 * s : 0)
+            .offset(y: configuration.isPressed ? 1 * scale : 0)
             .contentShape(shape)
     }
 }
@@ -187,19 +189,19 @@ public struct MwPrimaryButtonStyle: ButtonStyle {
 /// 흰 보조 버튼(Figma 51:3380 "판교어 해석").
 public struct MwSecondaryButtonStyle: ButtonStyle {
     let height: CGFloat
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(height: CGFloat = 48) {
         self.height = height
     }
 
     public func makeBody(configuration: Configuration) -> some View {
-        let shape = RoundedRectangle(cornerRadius: 18 * s, style: .circular)
+        let shape = RoundedRectangle(cornerRadius: 18 * scale, style: .circular)
         configuration.label
             .foregroundStyle(MwColor.textPrimary)
-            .frame(maxWidth: .infinity, minHeight: height * s)
+            .frame(maxWidth: .infinity, minHeight: height * scale)
             .background(shape.fill(MwColor.surface))
-            .mwRaisedShadow(s)
+            .mwRaisedShadow(scale)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .contentShape(shape)
     }
@@ -210,22 +212,22 @@ public struct MwSecondaryButtonStyle: ButtonStyle {
 /// 할 일 체크 상자(26×26, 모서리 9, 테두리 2).
 public struct MwCheckbox: View {
     let isOn: Bool
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(isOn: Bool) {
         self.isOn = isOn
     }
 
     public var body: some View {
-        let shape = RoundedRectangle(cornerRadius: 9 * s, style: .circular)
+        let shape = RoundedRectangle(cornerRadius: 9 * scale, style: .circular)
         ZStack {
             shape.fill(isOn ? MwColor.accentFill : MwColor.surface)
-            shape.strokeBorder(isOn ? MwColor.accentFill : MwColor.checkboxBorder, lineWidth: 2 * s)
+            shape.strokeBorder(isOn ? MwColor.accentFill : MwColor.checkboxBorder, lineWidth: 2 * scale)
             if isOn {
                 MwIconView(.check, color: MwColor.accentOnFill)
             }
         }
-        .frame(width: 26 * s, height: 26 * s)
+        .frame(width: 26 * scale, height: 26 * scale)
     }
 }
 
@@ -239,7 +241,7 @@ public struct MwStatusPill: View {
     let tone: Tone
     let height: CGFloat
     let size: CGFloat
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(_ text: Text, tone: Tone, height: CGFloat = 26, size: CGFloat = 13) {
         self.text = text
@@ -253,9 +255,9 @@ public struct MwStatusPill: View {
             .mwFont(.bold, size)
             .foregroundStyle(foreground)
             .lineLimit(1)
-            .padding(.horizontal, 10 * s)
-            .frame(minHeight: height * s)
-            .background(RoundedRectangle(cornerRadius: 9 * s, style: .circular).fill(background))
+            .padding(.horizontal, 10 * scale)
+            .frame(minHeight: height * scale)
+            .background(RoundedRectangle(cornerRadius: 9 * scale, style: .circular).fill(background))
     }
 
     private var foreground: Color {
@@ -283,7 +285,7 @@ public struct MwSourceChip: View {
     let text: Text
     let height: CGFloat
     let size: CGFloat
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(icon: MwIcon?, _ text: Text, height: CGFloat = 22, size: CGFloat = 12) {
         self.icon = icon
@@ -293,15 +295,15 @@ public struct MwSourceChip: View {
     }
 
     public var body: some View {
-        HStack(spacing: 4 * s) {
+        HStack(spacing: 4 * scale) {
             if let icon {
                 MwIconView(icon, color: MwColor.textStrong)
             }
             text.mwFont(.bold, size).foregroundStyle(MwColor.textStrong).lineLimit(1)
         }
-        .padding(.horizontal, 8 * s)
-        .frame(minHeight: height * s)
-        .background(RoundedRectangle(cornerRadius: 7 * s, style: .circular).fill(MwColor.chipFill))
+        .padding(.horizontal, 8 * scale)
+        .frame(minHeight: height * scale)
+        .background(RoundedRectangle(cornerRadius: 7 * scale, style: .circular).fill(MwColor.chipFill))
     }
 }
 
@@ -309,7 +311,7 @@ public struct MwSourceChip: View {
 public struct MwSectionHeader<Trailing: View>: View {
     let title: Text
     let trailing: Trailing
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(_ title: Text, @ViewBuilder trailing: () -> Trailing) {
         self.title = title
@@ -319,11 +321,11 @@ public struct MwSectionHeader<Trailing: View>: View {
     public var body: some View {
         HStack {
             title.mwFont(.semiBold, 14).foregroundStyle(MwColor.textSecondary).accessibilityAddTraits(.isHeader)
-            Spacer(minLength: 8 * s)
+            Spacer(minLength: 8 * scale)
             trailing
         }
-        .padding(.horizontal, 4 * s)
-        .padding(.bottom, 8 * s)
+        .padding(.horizontal, 4 * scale)
+        .padding(.bottom, 8 * scale)
     }
 }
 
@@ -335,30 +337,33 @@ public extension MwSectionHeader where Trailing == EmptyView {
 
 /// 흰 목록 카드(모서리 20) 안의 행들 사이 구분선(왼쪽 18 들여씀).
 public struct MwRowDivider: View {
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init() {}
 
     public var body: some View {
-        Rectangle().fill(MwColor.separator).frame(height: 1).padding(.leading, 18 * s)
+        // Figma 구분선은 다음 줄 위에 겹쳐 그려진다(absolute top 0) → 높이 0으로 두고 1pt를 넘쳐 그린다.
+        // swiftlint:disable:next no_fixed_height - 1pt 구분선(글자 없음)
+        Rectangle().fill(MwColor.separator).frame(height: 1).padding(.leading, 18 * scale)
+            .frame(maxHeight: 0, alignment: .bottom)
     }
 }
 
 /// 시트 손잡이(40×5, Figma 51:2202).
 public struct MwGrabber: View {
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init() {}
 
     public var body: some View {
-        Capsule().fill(MwColor.sheetGrabber).frame(width: 40 * s, height: 5 * s).accessibilityHidden(true)
+        Capsule().fill(MwColor.sheetGrabber).frame(width: 40 * scale, height: 5 * scale).accessibilityHidden(true)
     }
 }
 
 /// 아래에서 잠깐 떴다 사라지는 안내(다음 업데이트 기능 등). VoiceOver에도 읽힌다.
 public struct MwToast: View {
     let text: Text
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     public init(_ text: Text) {
         self.text = text
@@ -369,63 +374,11 @@ public struct MwToast: View {
             .mwFont(.semiBold, 14)
             .foregroundStyle(MwColor.textPrimary)
             .multilineTextAlignment(.center)
-            .padding(.horizontal, 16 * s)
-            .padding(.vertical, 12 * s)
+            .padding(.horizontal, 16 * scale)
+            .padding(.vertical, 12 * scale)
             .background(MwGlassBackground(cornerRadius: 18))
-            .mwGlassShadow(s)
-            .padding(.horizontal, 20 * s)
+            .mwGlassShadow(scale)
+            .padding(.horizontal, 20 * scale)
             .accessibilityAddTraits(.updatesFrequently)
-    }
-}
-
-/// 칩 줄바꿈 배치(Figma 51:2334: 간격 6). 줄이 넘치면 다음 줄로.
-public struct MwFlowLayout: Layout {
-    let spacing: CGFloat
-
-    public init(spacing: CGFloat) {
-        self.spacing = spacing
-    }
-
-    public func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache _: inout ()) -> CGSize {
-        let width = proposal.width ?? .infinity
-        let rows = Self.rows(width: width, sizes: subviews.map { $0.sizeThatFits(.unspecified) }, spacing: spacing)
-        let height = rows.map(\.height).reduce(0, +) + spacing * CGFloat(max(rows.count - 1, 0))
-        let used = rows.map(\.width).max() ?? 0
-        return CGSize(width: proposal.width ?? used, height: height)
-    }
-
-    public func placeSubviews(in bounds: CGRect, proposal _: ProposedViewSize, subviews: Subviews, cache _: inout ()) {
-        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
-        var y = bounds.minY
-        for row in Self.rows(width: bounds.width, sizes: sizes, spacing: spacing) {
-            var x = bounds.minX
-            for index in row.indices {
-                subviews[index].place(at: CGPoint(x: x, y: y), proposal: ProposedViewSize(sizes[index]))
-                x += sizes[index].width + spacing
-            }
-            y += row.height + spacing
-        }
-    }
-
-    struct Row {
-        var indices: [Int] = []
-        var width: CGFloat = 0
-        var height: CGFloat = 0
-    }
-
-    static func rows(width: CGFloat, sizes: [CGSize], spacing: CGFloat) -> [Row] {
-        var rows: [Row] = [Row()]
-        for (i, size) in sizes.enumerated() {
-            let needed = rows[rows.count - 1].indices.isEmpty ? size.width : rows[rows.count - 1].width + spacing + size.width
-            if needed > width, !rows[rows.count - 1].indices.isEmpty {
-                rows.append(Row())
-            }
-            var row = rows[rows.count - 1]
-            row.width = row.indices.isEmpty ? size.width : row.width + spacing + size.width
-            row.height = max(row.height, size.height)
-            row.indices.append(i)
-            rows[rows.count - 1] = row
-        }
-        return rows.filter { !$0.indices.isEmpty }
     }
 }

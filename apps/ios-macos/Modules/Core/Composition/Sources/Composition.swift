@@ -21,8 +21,10 @@ struct AppRootView: View {
     @State private var toastTask: Task<Void, Never>?
     @State private var aiConsent = false
     /// 방금 해석한 결과는 다시 받지 않고 바로 보여 준다.
-    @State private var prefetched: Translation?
-    @Environment(\.mwScale) private var s
+    @State private var prefetched: Domain.Translation?
+    @Environment(\.mwScale) private var scale
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var bottomInset: CGFloat = 0
 
     private var translate: TranslateDependencies {
         TranslateDependencies(repository: session.translations, consent: session.consent)
@@ -40,7 +42,9 @@ struct AppRootView: View {
                                     ResultSheet(translationId: id, dependencies: translate, onChange: router.dataChanged, onNotice: show)
                                 }
                             }
+                        #if os(iOS)
                             .toolbar(.hidden, for: .navigationBar)
+                        #endif
                     }
                     .tag(tab)
                     #if os(iOS)
@@ -49,22 +53,24 @@ struct AppRootView: View {
                 }
             }
             MwTabBar(items: tabItems, selection: $router.selectedTab)
-                .padding(.bottom, 26 * s - 34 + 8)
+                // Figma: 탭 바 아래 끝 = 화면(기기) 아래 끝에서 26. 안전 영역(홈 인디케이터 34)을 빼고 내린다.
+                .offset(y: bottomInset - 26 * scale)
             if let toast, router.sheet == nil {
                 MwToast(Text(toast, bundle: .module))
-                    .padding(.bottom, 110 * s)
+                    .padding(.bottom, 110 * scale)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .accessibilityIdentifier("toast")
             }
         }
         .ignoresSafeArea(.keyboard)
+        .onGeometryChange(for: CGFloat.self) { $0.safeAreaInsets.bottom } action: { bottomInset = $0 }
         .environment(router)
-        .sheet(item: Binding(get: { router.sheet }, set: { router.sheet = $0 }), onDismiss: { prefetched = nil }) { sheet in
+        .sheet(item: Binding(get: { router.sheet }, set: { router.sheet = $0 }), onDismiss: { prefetched = nil }, content: { sheet in
             sheetContent(sheet)
                 .sheet(item: Binding(get: { router.sheetOverSheet }, set: { router.sheetOverSheet = $0 })) { over in
                     sheetContent(over).presentationDetents([.medium, .large])
                 }
-        }
+        })
         .task { aiConsent = await session.consent.isGranted() }
         .onChange(of: router.sheet) { _, _ in Task { aiConsent = await session.consent.isGranted() } }
         .onChange(of: router.dataVersion) { _, _ in Task { await session.reloadProfile() } }
@@ -73,7 +79,12 @@ struct AppRootView: View {
     @ViewBuilder private func root(for tab: AppTab) -> some View {
         switch tab {
         case .home:
-            HomeRootView(model: HomeViewModel(repository: session.translations), user: session.user, refreshKey: router.dataVersion, onNotice: show)
+            HomeRootView(
+                model: HomeViewModel(repository: session.translations),
+                user: session.user,
+                refreshKey: router.dataVersion,
+                onNotice: show
+            )
         case .project:
             ProjectRootView(dependencies: translate, refreshKey: router.dataVersion, onNotice: show)
         case .review:
@@ -115,12 +126,12 @@ struct AppRootView: View {
             }
         }
         .environment(router)
-        .environment(\.mwScale, s)
-        .presentationCornerRadius(32 * s)
+        .environment(\.mwScale, scale)
+        .presentationCornerRadius(32 * scale)
         .presentationDragIndicator(.hidden)
         .overlay(alignment: .bottom) {
             if let toast {
-                MwToast(Text(toast, bundle: .module)).padding(.bottom, 24 * s).allowsHitTesting(false)
+                MwToast(Text(toast, bundle: .module)).padding(.bottom, 24 * scale).allowsHitTesting(false)
             }
         }
     }
@@ -142,23 +153,23 @@ struct AppRootView: View {
     /// Composition 카탈로그에도 둔다(여기서 그리므로).
     private func show(_ key: LocalizedStringKey) {
         toastTask?.cancel()
-        withAnimation(.snappy) { toast = key }
+        withAnimation(MwMotion.toast(reduceMotion: reduceMotion)) { toast = key }
         toastTask = Task {
             try? await Task.sleep(for: .seconds(2.5))
             guard !Task.isCancelled else { return }
-            withAnimation(.snappy) { toast = nil }
+            withAnimation(MwMotion.toast(reduceMotion: reduceMotion)) { toast = nil }
         }
     }
 }
 
 /// 복습 탭(v1.1). Figma 탭은 두고 화면은 안내.
 struct ReviewComingSoonView: View {
-    @Environment(\.mwScale) private var s
+    @Environment(\.mwScale) private var scale
 
     var body: some View {
         ZStack {
             MwSceneBackground(.sky)
-            VStack(spacing: 12 * s) {
+            VStack(spacing: 12 * scale) {
                 MwIconView(.tabReview, color: MwColor.accentFill).scaleEffect(1.6)
                 Text("review.comingSoon.title", bundle: .module)
                     .mwFont(.bold, 22, lineHeight: 31, tracking: -0.33)
@@ -169,7 +180,7 @@ struct ReviewComingSoonView: View {
                     .foregroundStyle(MwColor.textSecondary)
                     .multilineTextAlignment(.center)
             }
-            .padding(24 * s)
+            .padding(24 * scale)
         }
     }
 }

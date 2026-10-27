@@ -279,13 +279,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "퇴근길 복습은 12월 업데이트에서 열려요."
+            "value": "퇴근길 복습은 다음 업데이트에서 열려요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Evening review arrives in the December update."
+            "value": "Evening review is coming in the next update."
           }
         }
       }

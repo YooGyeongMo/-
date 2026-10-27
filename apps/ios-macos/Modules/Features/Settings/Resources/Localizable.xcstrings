@@ -52,6 +52,23 @@
         }
       }
     },
+    "my.level.1.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "외지인"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outsider"
+          }
+        }
+      }
+    },
     "my.level.2.name": {
       "extractionState": "manual",
       "localizations": {
@@ -82,6 +99,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "20–39 · Hears but doesn't get it"
+          }
+        }
+      }
+    },
+    "my.level.2.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "관광객"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tourist"
           }
         }
       }
@@ -120,6 +154,23 @@
         }
       }
     },
+    "my.level.3.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "이주민"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Settler"
+          }
+        }
+      }
+    },
     "my.level.4.name": {
       "extractionState": "manual",
       "localizations": {
@@ -154,6 +205,23 @@
         }
       }
     },
+    "my.level.4.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "원주민"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Native"
+          }
+        }
+      }
+    },
     "my.level.5.name": {
       "extractionState": "manual",
       "localizations": {
@@ -184,6 +252,23 @@
           "stringUnit": {
             "state": "translated",
             "value": "85+ · Leads meetings in jargon"
+          }
+        }
+      }
+    },
+    "my.level.5.short": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "토박이"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Local"
           }
         }
       }
@@ -228,7 +313,7 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "지남"
+            "value": "통과"
           }
         },
         "en": {
@@ -330,13 +415,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "복습 알림 시간은 12월 업데이트에서 바꿀 수 있어요."
+            "value": "복습 알림 시간은 다음 업데이트에서 바꿀 수 있어요."
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "You can change the review time in the December update."
+            "value": "You can change the review time in the next update."
           }
         }
       }
@@ -466,13 +551,13 @@
         "ko": {
           "stringUnit": {
             "state": "translated",
-            "value": "로그인"
+            "value": "로그인한 계정"
           }
         },
         "en": {
           "stringUnit": {
             "state": "translated",
-            "value": "Signed in"
+            "value": "Signed in as"
           }
         }
       }
