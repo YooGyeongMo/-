@@ -181,6 +181,11 @@ def test_action_check_and_list(client: TestClient, auth: dict[str, str]) -> None
     r = client.patch(url, json={"isChecked": False, "alertEnabled": False}, headers=auth)
     assert r.json()["checkedAt"] is None and r.json()["alertEnabled"] is False
     assert client.patch(url, json={}, headers=auth).status_code == 400
+    # 계약: boolean(nullable 아님) → null 은 400 (schemathesis 가 찾은 것)
+    assert (
+        client.patch(url, json={"alertEnabled": False, "isChecked": None}, headers=auth).status_code
+        == 400
+    )
     bad = f"/api/translations/{t['translationId']}/actions/999"
     assert client.patch(bad, json={"isChecked": True}, headers=auth).json()["code"] == (
         "ACTION_NOT_FOUND"

@@ -1,0 +1,65 @@
+{
+ "feature_version": "c1",
+ "threshold": 0.9,
+ "seed": 20261027,
+ "params": {
+  "c1": 0.05,
+  "c2": 0.01,
+  "max_iterations": 200,
+  "feature.possible_transitions": true
+ },
+ "trainer": "python-crfsuite 0.9.12",
+ "data": "synthetic only (ml/pangyo-tagger/train_crf.py, server_terms.py), ADR-0008",
+ "sha256": "97b843963acaddfb4ffd234cca16d421df8d26bcc49d384aceb93db6fb5f0a0d",
+ "bytes": 176952,
+ "metrics": {
+  "dict": {
+   "test_seen": "F1 0.911 P 1.000 R 0.836 pred 621 gold 743",
+   "test_unseen_tpl": "F1 0.910 P 1.000 R 0.835 pred 394 gold 472",
+   "test_novel_spelling": "F1 0.000 P 0.000 R 0.000 pred 0 gold 322",
+   "test_new_terms": "F1 0.000 P 0.000 R 0.000 pred 0 gold 246",
+   "test_novel_x_unseen_tpl": "F1 0.000 P 0.000 R 0.000 pred 2 gold 254",
+   "test_new_x_unseen_tpl": "F1 0.000 P 0.000 R 0.000 pred 0 gold 244",
+   "test_traps": "F1 0.000 P 0.000 R 0.000 pred 1 gold 0",
+   "test_hardneg3": "F1 0.000 P 0.000 R 0.000 pred 0 gold 0",
+   "test_fresh_neg": "F1 0.000 P 0.000 R 0.000 pred 0 gold 0",
+   "ALL": "F1 0.615 P 0.997 R 0.445 pred 1018 gold 2281"
+  },
+  "crf": {
+   "test_seen": "F1 0.993 P 0.995 R 0.992 pred 741 gold 743",
+   "test_unseen_tpl": "F1 0.939 P 0.922 R 0.956 pred 489 gold 472",
+   "test_novel_spelling": "F1 0.825 P 0.983 R 0.711 pred 233 gold 322",
+   "test_new_terms": "F1 0.956 P 0.996 R 0.919 pred 227 gold 246",
+   "test_novel_x_unseen_tpl": "F1 0.745 P 0.895 R 0.638 pred 181 gold 254",
+   "test_new_x_unseen_tpl": "F1 0.887 P 0.921 R 0.857 pred 227 gold 244",
+   "test_traps": "F1 0.000 P 0.000 R 0.000 pred 4 gold 0",
+   "test_hardneg3": "F1 0.000 P 0.000 R 0.000 pred 26 gold 0",
+   "test_fresh_neg": "F1 0.000 P 0.000 R 0.000 pred 74 gold 0",
+   "ALL": "F1 0.919 P 0.958 R 0.883 pred 2102 gold 2281"
+  },
+  "server_hybrid_no_stoplist@0.9": {
+   "test_seen": "F1 1.000 P 1.000 R 1.000 pred 743 gold 743",
+   "test_unseen_tpl": "F1 0.995 P 1.000 R 0.989 pred 467 gold 472",
+   "test_novel_spelling": "F1 0.737 P 0.990 R 0.587 pred 191 gold 322",
+   "test_new_terms": "F1 0.887 P 0.995 R 0.801 pred 198 gold 246",
+   "test_novel_x_unseen_tpl": "F1 0.626 P 0.975 R 0.461 pred 120 gold 254",
+   "test_new_x_unseen_tpl": "F1 0.838 P 1.000 R 0.721 pred 176 gold 244",
+   "test_traps": "F1 0.000 P 0.000 R 0.000 pred 1 gold 0",
+   "test_hardneg3": "F1 0.000 P 0.000 R 0.000 pred 10 gold 0",
+   "test_fresh_neg": "F1 0.000 P 0.000 R 0.000 pred 36 gold 0",
+   "ALL": "F1 0.904 P 0.996 R 0.828 pred 1896 gold 2281"
+  },
+  "server_hybrid@0.9": {
+   "test_seen": "F1 1.000 P 1.000 R 1.000 pred 743 gold 743",
+   "test_unseen_tpl": "F1 0.995 P 1.000 R 0.989 pred 467 gold 472",
+   "test_novel_spelling": "F1 0.737 P 0.990 R 0.587 pred 191 gold 322",
+   "test_new_terms": "F1 0.887 P 0.995 R 0.801 pred 198 gold 246",
+   "test_novel_x_unseen_tpl": "F1 0.626 P 0.975 R 0.461 pred 120 gold 254",
+   "test_new_x_unseen_tpl": "F1 0.838 P 1.000 R 0.721 pred 176 gold 244",
+   "test_traps": "F1 0.000 P 0.000 R 0.000 pred 1 gold 0",
+   "test_hardneg3": "F1 0.000 P 0.000 R 0.000 pred 1 gold 0",
+   "test_fresh_neg": "F1 0.000 P 0.000 R 0.000 pred 36 gold 0",
+   "ALL": "F1 0.904 P 0.996 R 0.828 pred 1896 gold 2281"
+  }
+ }
+}

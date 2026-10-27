@@ -14,6 +14,7 @@ dependencies = [
   "pyjwt[crypto]>=2.10",
   "httpx>=0.27",
   "redis>=5.2",
+  "python-crfsuite>=0.9.12,<0.10",
 ]
 
 [dependency-groups]
@@ -39,6 +40,9 @@ select = ["E", "F", "I", "B", "UP", "S"]
 "tests/*" = ["S101"]
 [tool.mypy]
 strict = true
+[[tool.mypy.overrides]]
+module = ["pycrfsuite"]  # 타입 정보가 없는 C 확장(ADR-0023). 감싼 쪽(jargon_model)에서 타입을 붙인다
+ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
