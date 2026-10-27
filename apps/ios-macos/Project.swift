@@ -91,6 +91,17 @@ let apps: [Target] = [
         dependencies: [.target(name: "Composition")],
         settings: apiSettings
     ),
+    // E2E(로컬 서버 필요: services/api/scripts/dev_server.py). 로그인 → 붙여넣기 → 결과 → 기록 → 설정.
+    // CI PR 에서는 돌리지 않는다(서버가 없다). 스킴 MwonmalE2E 로 따로 돌린다.
+    .target(
+        name: "MwonmalE2E",
+        destinations: [.iPhone],
+        product: .uiTests,
+        bundleId: "kr.mwonmal.app.e2e",
+        deploymentTargets: .iOS("17.0"),
+        sources: ["Apps/IOS/E2E/**"],
+        dependencies: [.target(name: "MwonmalIOS")]
+    ),
     .target(
         name: "MwonmalUICatalog",
         destinations: [.iPhone, .iPad, .mac],
@@ -130,6 +141,12 @@ let project = Project(
             buildAction: .buildAction(targets: ["MwonmalMac"]),
             testAction: .targets(unitTests),
             runAction: .runAction(executable: "MwonmalMac")
+        ),
+        .scheme(
+            name: "MwonmalE2E",
+            buildAction: .buildAction(targets: ["MwonmalIOS", "MwonmalE2E"]),
+            testAction: .targets(["MwonmalE2E"]),
+            runAction: .runAction(executable: "MwonmalIOS")
         ),
         .scheme(
             name: "MwonmalUICatalog",

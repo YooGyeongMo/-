@@ -283,6 +283,7 @@ struct SignInButton: View {
             .contentShape(shape)
         }
         .buttonStyle(.plain)
+        .accessibilityIdentifier("signin.\(kind)")
     }
 
     private var shape: RoundedRectangle {
