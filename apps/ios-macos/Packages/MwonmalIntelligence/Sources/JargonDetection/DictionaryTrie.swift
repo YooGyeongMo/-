@@ -69,20 +69,45 @@ public struct DictionaryTrie: Sendable {
         return out
     }
 
-    /// 한글 용어 바로 뒤에 붙어도 되는 글자(서버 `HANGUL_FOLLOWERS`와 같은 목록).
-    static let hangulFollowers: Set<Unicode.Scalar> = Set(
-        ("을를이가은는도만의로으랑과와에께서" + "인일입이였예야요라고며면나" + "하해했합한할함하던됐돼된될되됩" + "치쳐쳤칠칩친" + "들까부보처").unicodeScalars
-    )
+    /// 한글 용어 바로 뒤 — 활용(뒤에 무엇이 와도 됨). 서버 `matching.VERB_STEMS`와 같다.
+    static let verbStems: [String] = [
+        "하", "해", "했", "합", "한", "할", "함", "되", "돼", "됐", "된", "될", "됩", "치", "쳐", "쳤", "칠", "칩", "친",
+        "시키", "시켜", "시킨", "시킬", "시켰", "받", "드리", "드려", "드릴", "드립", "드렸", "있", "없", "맞추", "맞춰", "좀",
+    ]
 
-    /// `end`에서 낱말이 끝나는지.
+    /// 조사·의존명사 — 낱말 경계에서 끝나는 사슬일 때만. 서버 `matching.PARTICLES`와 같다(긴 것부터).
+    static let particles: [String] = [
+        "을", "를", "이", "가", "은", "는", "도", "만", "의", "로", "으로", "에", "에서", "에게", "께",
+        "과", "와", "랑", "이랑", "까지", "부터", "보다", "처럼", "마다", "뿐", "대로", "상", "별", "별로",
+        "쪽", "용", "엔", "밖", "때", "전", "후", "중", "들", "이나", "나", "요", "예요", "이에요",
+        "이야", "야", "이고", "고", "이라", "라", "이며", "며", "이면", "면", "인", "일", "입니다",
+        "이죠", "죠", "이다", "다", "이었", "였",
+    ].sorted { $0.unicodeScalars.count > $1.unicodeScalars.count }
+
+    private static func starts(_ raw: ArraySlice<Unicode.Scalar>, with word: String) -> Bool {
+        let w = Array(word.unicodeScalars)
+        return raw.count >= w.count && Array(raw.prefix(w.count)) == w
+    }
+
+    private static func particlesOK(_ rest: ArraySlice<Unicode.Scalar>, depth: Int) -> Bool {
+        guard let first = rest.first, ScalarClass(first) == .hangul else { return true }
+        guard depth > 0 else { return false }
+        return particles.contains { p in
+            starts(rest, with: p) && particlesOK(rest.dropFirst(p.unicodeScalars.count), depth: depth - 1)
+        }
+    }
+
+    /// `end`에서 낱말이 끝나는지(서버 `ends_word`와 같은 규칙).
     private static func endsWord(_ raw: [Unicode.Scalar], at end: Int) -> Bool {
         guard end > 0, end < raw.count else { return true }
         let last = ScalarClass(raw[end - 1]), next = ScalarClass(raw[end])
         if last == .latin {
-            return next != .latin
+            guard next == .latin else { return true }
+            return raw[end] == "s" && (end + 1 == raw.count || ScalarClass(raw[end + 1]) != .latin)
         }
         if last == .hangul, next == .hangul {
-            return hangulFollowers.contains(raw[end])
+            let rest = raw[end...]
+            return verbStems.contains { starts(rest, with: $0) } || particlesOK(rest, depth: 3)
         }
         return true
     }

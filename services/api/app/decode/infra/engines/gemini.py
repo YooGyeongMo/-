@@ -109,7 +109,8 @@ def parse(payload: dict[str, Any], request: EngineRequest, model: str) -> Engine
     않는다)."""
     if not isinstance(payload, dict):
         raise EngineError("bad_response")
-    if (payload.get("promptFeedback") or {}).get("blockReason"):
+    feedback = payload.get("promptFeedback")
+    if isinstance(feedback, dict) and feedback.get("blockReason"):
         raise EngineError("blocked", counts_as_failure=False)
     try:
         candidate = payload["candidates"][0]

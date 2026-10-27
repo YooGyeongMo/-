@@ -19,11 +19,20 @@ NEW_TERM_CONFIDENCE = 0.7
 def visible(text: str) -> bool:
     """공백·서식 문자(ZWSP 등)만으로 된 입력은 내용이 없다."""
     return any(
-        not ch.isspace() and unicodedata.category(ch) not in ("Cf", "Cc", "Zs") for ch in text
+        not ch.isspace()
+        and unicodedata.category(ch) not in ("Cf", "Cc", "Zs")
+        and ch not in INVISIBLE_FILLERS
+        for ch in text
     )
 
 
+# 한글 채움 문자·점자 빈칸: 글자처럼 보이지만 내용이 없다(레드팀 2차 L-4).
+INVISIBLE_FILLERS = frozenset("\u3164\uffa0\u115f\u1160\u2800")
+
+
 class Router(Protocol):
+    def can_use_external(self, consent: bool) -> bool: ...
+
     async def decode(
         self, request: EngineRequest, *, consent: bool
     ) -> tuple[EngineResult, int]: ...
@@ -82,7 +91,7 @@ async def translate(
         source_text=source_text,
         input_source=input_source,
         source_image_url=source_image_url,
-        consent=consent,
+        prefer_external=router.can_use_external(consent),
     )
     if reused is not None:
         return reused

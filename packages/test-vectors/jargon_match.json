@@ -1,5 +1,5 @@
 {
- "_doc": "사전 매칭 정답(#12). 인덱스 = 유니코드 스칼라 위치, end 는 포함하지 않음. 서버 decode/domain/matching.py 와 앱 DictionaryTrie 가 같이 읽는다. dictionary = 표기 → 키. 끝 경계: 라틴 뒤 라틴 금지, 한글 뒤에는 조사·활용 글자만(서버 matching.HANGUL_FOLLOWERS).",
+ "_doc": "사전 매칭 정답(#12). 인덱스 = 유니코드 스칼라 위치, end 는 포함하지 않음. 서버 decode/domain/matching.py 와 앱 DictionaryTrie 가 같이 읽는다. dictionary = 표기 → 키. 끝 경계: 라틴 뒤 라틴 금지(복수 s 하나는 허용), 한글 뒤에는 활용(VERB_STEMS) 또는 낱말 경계에서 끝나는 조사 사슬(PARTICLES)만.",
  "dictionary": {
   "얼라인": "align",
   "align": "align",
@@ -11,7 +11,12 @@
   "챌린지": "challenge",
   "싱크": "sync",
   "ASAP": "asap",
-  "킥오프": "kick-off"
+  "킥오프": "kick-off",
+  "컨펌": "confirm",
+  "데드라인": "deadline",
+  "API": "api",
+  "공수": "man-month",
+  "밸류": "value"
  },
  "cases": [
   {
@@ -178,6 +183,52 @@
   },
   {
    "text": "넥스트북 샀어요",
+   "spans": []
+  },
+  {
+   "text": "싱크로율이 높네요",
+   "spans": []
+  },
+  {
+   "text": "공수부대 출신",
+   "spans": []
+  },
+  {
+   "text": "밸류에이션이 높아요",
+   "spans": []
+  },
+  {
+   "text": "컨펌받고 진행",
+   "spans": [
+    [
+     0,
+     2,
+     "confirm"
+    ]
+   ]
+  },
+  {
+   "text": "데드라인전에 끝내요",
+   "spans": [
+    [
+     0,
+     4,
+     "deadline"
+    ]
+   ]
+  },
+  {
+   "text": "APIs 정리",
+   "spans": [
+    [
+     0,
+     3,
+     "api"
+    ]
+   ]
+  },
+  {
+   "text": "APIX 아님",
    "spans": []
   }
  ]

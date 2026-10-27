@@ -72,7 +72,10 @@ class Dictionary:
 
     def spans(self, text: str) -> list[Span]:
         out: list[Span] = []
+        has_hangul = any("\uac00" <= ch <= "\ud7a3" for ch in text)
         for m in self.trie.find(text):
+            if not has_hangul and m.matched_text.lower() in LATIN_ALLOW:
+                continue  # 영어 문장의 "align"은 판교어가 아니다(레드팀 2차)
             t = self.terms.get(m.key)
             if t is not None:
                 out.append(
@@ -178,14 +181,15 @@ async def resolve_project(s: AsyncSession, user_id: int, project_id: int | None)
     return await ensure_default_project(s, user_id)
 
 
-async def _default_project(s: AsyncSession, user_id: int) -> ProjectRef | None:
-    row = (
-        await s.execute(
-            sa.select(_projects.c.id, _projects.c.name)
-            .where(_projects.c.user_id == user_id, _projects.c.name == DEFAULT_PROJECT_NAME)
-            .with_for_update(read=True)
-        )
-    ).first()
+async def _default_project(
+    s: AsyncSession, user_id: int, *, locking: bool = False
+) -> ProjectRef | None:
+    # 첫 조회는 잠금 없이(없는 행을 FOR SHARE 하면 InnoDB 가 gap 잠금을 걸어 동시 INSERT 끼리 교착,
+    # 레드팀 2차 B-2). INSERT 가 유니크 위반으로 실패한 뒤에만 잠금 읽기로 최신 커밋을 본다.
+    stmt = sa.select(_projects.c.id, _projects.c.name).where(
+        _projects.c.user_id == user_id, _projects.c.name == DEFAULT_PROJECT_NAME
+    )
+    row = (await s.execute(stmt.with_for_update(read=True) if locking else stmt)).first()
     if row is None:
         row = (
             await s.execute(
@@ -218,8 +222,9 @@ async def ensure_default_project(s: AsyncSession, user_id: int) -> ProjectRef:
                     )
                 )
         except IntegrityError:
-            pass  # 다른 요청이 막 만들었다 → 아래에서 다시 읽는다
-        ref = await _default_project(s, user_id)
+            ref = await _default_project(s, user_id, locking=True)  # 다른 요청이 막 만들었다
+        else:
+            ref = await _default_project(s, user_id)
         if ref is None:  # 이론상 없음(만들었거나 남이 만들었다)
             raise DomainError(ErrorCode.PROJECT_NOT_FOUND, "프로젝트를 찾을 수 없어요.")
     await s.execute(_users.update().where(_users.c.id == user_id).values(current_project_id=ref.id))
@@ -254,13 +259,14 @@ async def recent_duplicate(
     source_text: str,
     input_source: str,
     source_image_url: str | None,
-    consent: bool,
+    prefer_external: bool,
 ) -> int | None:
     """10분 안에 같은 원문을 같은 곳·같은 입력으로 해석했으면 그 기록을 다시 쓴다(중복 저장·AI
     호출 방지).
 
     - 원문 비교는 파이썬에서 한 번 더 한다(MySQL 기본 collation 은 대소문자·악센트를 무시한다).
-    - 이번엔 AI 동의를 했는데 지난 결과가 사전 간이 해석이면 다시 쓰지 않는다(레드팀 M-5).
+    - 이번엔 외부 엔진을 쓸 수 있는데(동의 + 설정 + 키) 지난 결과가 사전 간이 해석이면 다시 쓰지
+      않는다.
     """
     stmt = (
         sa.select(Translation.id, Translation.source_text, Translation.ai_model)
@@ -284,8 +290,8 @@ async def recent_duplicate(
     for row in (await s.execute(stmt)).all():
         if row.source_text != source_text:
             continue
-        if consent and str(row.ai_model).startswith("none/"):
-            return None
+        if prefer_external and str(row.ai_model).startswith("none/"):
+            return None  # 지금은 AI 로 할 수 있는데 지난 건 사전 결과 → 새로 해석(레드팀 2차 B-1)
         return int(row.id)
     return None
 

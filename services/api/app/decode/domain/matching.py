@@ -78,31 +78,143 @@ def same_word(prev: str, ch: str) -> bool:
     return scalar_class(prev) == scalar_class(ch)
 
 
-# 한글 용어 바로 뒤에 붙어도 되는 글자: 조사·서술격·하다/되다/치다 활용·복수(들).
-# 그 밖의 한글이 붙으면 다른 낱말이다("머지않아", "싱크대", "버퍼링", "푸시업", "공수표").
-HANGUL_FOLLOWERS = frozenset(
-    "을를이가은는도만의로으랑과와에께서"  # 조사
-    "인일입이였예야요라고며면나"  # 서술격(이다) 활용
-    "하해했합한할함하던됐돼된될되됩"  # 하다·되다
-    "치쳐쳤칠칩친"  # 치다(얼라인 치다)
-    "들까부보처"  # 들, 까지, 부터, 보다, 처럼
+# 한글 용어 바로 뒤에 붙을 수 있는 것(레드팀 2차 B-3: 한 글자가 아니라 문자열로 본다).
+# - 활용(뒤에 무엇이 와도 된다): 하다·되다·치다·시키다·받다·드리다·있다·없다·맞추다 …
+# - 조사·의존명사(뒤가 끝·공백·문장부호이거나 다른 조사로 이어질 때만): "로" O, "로율"(싱크로율) X.
+VERB_STEMS: tuple[str, ...] = (
+    "하",
+    "해",
+    "했",
+    "합",
+    "한",
+    "할",
+    "함",
+    "되",
+    "돼",
+    "됐",
+    "된",
+    "될",
+    "됩",
+    "치",
+    "쳐",
+    "쳤",
+    "칠",
+    "칩",
+    "친",
+    "시키",
+    "시켜",
+    "시킨",
+    "시킬",
+    "시켰",
+    "받",
+    "드리",
+    "드려",
+    "드릴",
+    "드립",
+    "드렸",
+    "있",
+    "없",
+    "맞추",
+    "맞춰",
+    "좀",
 )
+PARTICLES: tuple[str, ...] = tuple(
+    sorted(
+        {
+            "을",
+            "를",
+            "이",
+            "가",
+            "은",
+            "는",
+            "도",
+            "만",
+            "의",
+            "로",
+            "으로",
+            "에",
+            "에서",
+            "에게",
+            "께",
+            "과",
+            "와",
+            "랑",
+            "이랑",
+            "까지",
+            "부터",
+            "보다",
+            "처럼",
+            "마다",
+            "뿐",
+            "대로",
+            "상",
+            "별",
+            "별로",
+            "쪽",
+            "용",
+            "엔",
+            "밖",
+            "때",
+            "전",
+            "후",
+            "중",
+            "들",
+            "이나",
+            "나",
+            "요",
+            "예요",
+            "이에요",
+            "이야",
+            "야",
+            "이고",
+            "고",
+            "이라",
+            "라",
+            "이며",
+            "며",
+            "이면",
+            "면",
+            "인",
+            "일",
+            "입니다",
+            "이죠",
+            "죠",
+            "이다",
+            "다",
+            "이었",
+            "였",
+        },
+        key=len,
+        reverse=True,
+    )
+)
+FOLLOWER_DEPTH = 3
+
+
+def _particles_ok(rest: str, depth: int) -> bool:
+    """`rest`가 조사 사슬로 시작해 낱말 경계에서 끝나는지."""
+    if not rest or scalar_class(rest[0]) != "H":
+        return True
+    if depth == 0:
+        return False
+    return any(rest.startswith(p) and _particles_ok(rest[len(p) :], depth - 1) for p in PARTICLES)
 
 
 def ends_word(text: str, end: int) -> bool:
     """`end` 위치에서 낱말이 끝나는지(끝 경계, ADR-0018 오탐 관문).
 
-    - 라틴·숫자 뒤에 라틴·숫자가 이어지면 아니다("special", "Next.js"의 Next는 '.'이라 통과 →
-      사전에서 뺀다).
-    - 한글 뒤에는 조사·활용 글자만 올 수 있다(HANGUL_FOLLOWERS).
+    - 라틴·숫자 뒤에 라틴·숫자가 이어지면 아니다. 단 영어 복수 s 하나는 된다("APIs").
+    - 한글 뒤: 활용(VERB_STEMS)이면 된다. 아니면 조사 사슬이 낱말 경계에서 끝나야 한다.
     """
     if end >= len(text) or end == 0:
         return True
-    last, nxt = text[end - 1], text[end]
+    last, rest = text[end - 1], text[end:]
     if scalar_class(last) == "L":
-        return scalar_class(nxt) != "L"
-    if scalar_class(last) == "H" and scalar_class(nxt) == "H":
-        return nxt in HANGUL_FOLLOWERS
+        if scalar_class(rest[0]) != "L":
+            return True
+        return rest[0] == "s" and (len(rest) == 1 or scalar_class(rest[1]) != "L")
+    if scalar_class(last) == "H" and scalar_class(rest[0]) == "H":
+        return rest.startswith(VERB_STEMS) or _particles_ok(rest, FOLLOWER_DEPTH)
     return True
 
 
@@ -177,6 +289,13 @@ def fix_josa(replacement: str, following: str) -> str:
     return ""
 
 
+def _same_verb(plain: str, rest: str) -> bool:
+    """쉬운 말 끝 동사(맞추기)와 원문 바로 뒤 동사(맞춰)가 같은 말인지 — 첫 음절로 본다."""
+    last = plain.rsplit(" ", 1)[-1]
+    nxt = rest.lstrip()
+    return rest[:1] == " " and len(last) >= 2 and nxt[:1] == last[:1]
+
+
 def _fix_copula(replacement: str, rest: str) -> tuple[str, int] | None:
     """(새로 쓸 글자, 원문에서 건너뛸 길이). 고칠 것이 없으면 None."""
     batchim = _has_batchim(replacement[-1]) if replacement else None
@@ -210,6 +329,14 @@ def substitute(text: str, matches: list[Match], plain_of: dict[str, str]) -> str
             # "얼라인 쳐주세요" → "방향 맞추기 해 주세요": 판교어에 붙는 '치다'는 '하다'로.
             out.append(_LIGHT_VERBS[light])
             cursor += len(light)
+            continue
+        if plain.endswith("기") and rest[:1] in ("하", "해", "했", "합", "한", "할"):
+            out.append("를 ")  # "방향 맞추기해서" → "방향 맞추기를 해서"(레드팀 2차 B-8)
+            continue
+        if plain.endswith("기") and _same_verb(plain, rest):
+            out[-1] = (
+                plain.rsplit(" ", 1)[0] if " " in plain else plain
+            )  # "방향 맞추기 맞춰" → "방향 맞춰"
             continue
         copula = _fix_copula(plain, rest)
         if copula is not None:

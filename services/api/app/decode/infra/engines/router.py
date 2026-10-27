@@ -50,11 +50,14 @@ class EngineRouter:
         ext = self._external
         skip = self._skip_reason(consent)
         if skip is None and ext is not None:
+            ticket = None
             try:
                 ticket = await ext.breaker.allow()
                 has_quota = ticket is not None and await ext.quota.take()
             except Exception as e:  # noqa: BLE001 - Redis 장애 등: 외부 엔진만 건너뛴다
                 log.warning("ai_guard_unavailable type=%s", type(e).__name__)
+                if ticket is not None:
+                    await self._safely(ext.breaker.release(ticket))
                 ticket, has_quota, skip = None, False, "GUARD_DOWN"
             if ticket is None:
                 skip = skip or "BREAKER_OPEN"
@@ -88,6 +91,11 @@ class EngineRouter:
             await op
         except Exception as e:  # noqa: BLE001 - 보고 실패로 사용자 요청을 깨지 않는다
             log.warning("ai_guard_report_failed type=%s", type(e).__name__)
+
+    def can_use_external(self, consent: bool) -> bool:
+        """이번 요청에 외부 엔진을 쓸 수 있는 조건인지(동의·설정·키). 브레이커·한도는 보지
+        않는다."""
+        return self._skip_reason(consent) is None
 
     def _skip_reason(self, consent: bool) -> str | None:
         if not consent:

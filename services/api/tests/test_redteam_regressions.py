@@ -2,7 +2,7 @@
 
 import json
 import threading
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Any
 
 import pytest
@@ -117,13 +117,39 @@ def test_due_combines_date_and_time(sentence: str, kst: tuple[int, int, int, int
     assert (due.month, day, local.hour, local.minute) == kst, hint
 
 
+def test_due_not_from_duration_or_design_draft() -> None:
+    """ "1시간"·"1시안"은 시각이 아니다."""
+    for sentence in ["1시간 정도 걸리니 해 주세요", "1시안 공유해 주세요"]:
+        assert rules.due_at(rules.due_hint(sentence), NOW) is None
+
+
 @pytest.mark.parametrize(
-    "sentence",
-    ["오전 7시까지 출근해 주세요", "1시간 정도 걸리니 해 주세요", "8시까지 와 주세요"],
+    ("sentence", "kst"),
+    [
+        ("오전 7시까지 출근해 주세요", (10, 28, 7, 0)),  # 오늘 7시는 지남 → 내일 7시
+        ("8시까지 와 주세요", (10, 27, 20, 0)),  # 오전·오후를 안 밝힘 → 오후 8시
+        ("새벽 2시까지", (10, 28, 2, 0)),
+        ("밤 12시까지", (10, 28, 0, 0)),
+        ("자정까지", (10, 28, 0, 0)),
+        ("정오까지", (10, 27, 12, 0)),
+        ("내일 아침까지", (10, 28, 9, 0)),
+        ("11월 3일 3시까지 공유", (11, 3, 15, 0)),
+        ("10/30까지", (10, 30, 18, 0)),
+        ("오늘은 어렵고 내일 3시까지 리뷰", (10, 28, 15, 0)),
+        ("금요일 회의 전에 목요일까지", (10, 29, 18, 0)),
+        ("다음 주까지", (11, 6, 18, 0)),
+    ],
 )
-def test_due_not_in_past_or_from_duration(sentence: str) -> None:
-    """오전 7시는 19시가 아니고(이미 지남), "1시간"은 시각이 아니다."""
-    assert rules.due_at(rules.due_hint(sentence), NOW) is None
+def test_due_round2(sentence: str, kst: tuple[int, int, int, int]) -> None:
+    """레드팀 2차 B-5·B-6·B-7."""
+    due = rules.due_at(rules.due_hint(sentence), NOW)
+    assert due is not None, sentence
+    local = due + timedelta(hours=9)
+    assert (local.month, local.day, local.hour, local.minute) == kst
+
+
+def test_past_weekday_this_week_is_none() -> None:
+    assert rules.due_at(rules.due_hint("이번 주 월요일까지"), NOW) is None
 
 
 @pytest.mark.parametrize(
@@ -241,17 +267,63 @@ def test_concurrent_first_translations_make_one_project(
     assert client.get("/api/projects", headers=auth).json()["totalElements"] == 1
 
 
-def test_reuse_respects_input_source_and_consent(client: TestClient, fake_apple: FakeApple) -> None:
+def test_reuse_respects_input_source(client: TestClient, fake_apple: FakeApple) -> None:
     auth = login(client, fake_apple, "reuse")
     body = {"sourceText": "얼라인 부탁", "direction": "JARGON_TO_PLAIN"}
     a = client.post("/api/translations", json=body, headers=auth).json()["translationId"]
     shot = {**body, "inputSource": "SCREENSHOT", "sourceImageUrl": "https://cdn.example/a.png"}
     b = client.post("/api/translations", json=shot, headers=auth).json()["translationId"]
     assert a != b
-    c = client.post(
-        "/api/translations", json=body, headers={**auth, "X-Mw-AI-Consent": "1"}
-    ).json()["translationId"]
-    assert c != a, "동의를 새로 켰으면 지난 사전 결과를 다시 쓰지 않는다"
+
+
+def test_consent_without_external_engine_still_reuses(
+    client: TestClient, fake_apple: FakeApple
+) -> None:
+    """레드팀 2차 B-1: 동의했어도 외부 엔진을 못 쓰는 상태면 같은 요청은 재사용(중복 저장 없음)."""
+    auth = {**login(client, fake_apple, "reuse2"), "X-Mw-AI-Consent": "1"}
+    body = {"sourceText": "얼라인 부탁", "direction": "JARGON_TO_PLAIN"}
+    ids = {
+        client.post("/api/translations", json=body, headers=auth).json()["translationId"]
+        for _ in range(3)
+    }
+    assert len(ids) == 1
+
+
+def test_consent_with_external_engine_redoes_dictionary_result(
+    client: TestClient, fake_apple: FakeApple
+) -> None:
+    from app.core.kv import MemoryKV
+    from app.decode.api.routes import engine_router
+    from app.decode.infra.engines.guards import Breaker, Quota
+    from app.decode.infra.engines.none_engine import NoneEngine
+    from app.decode.infra.engines.router import EngineRouter, ExternalEngine
+    from app.main import app
+    from tests.test_translations import FakeExternal
+
+    auth = login(client, fake_apple, "reuse3")
+    body = {"sourceText": "얼라인 부탁", "direction": "JARGON_TO_PLAIN"}
+    first = client.post("/api/translations", json=body, headers=auth).json()
+    kv = MemoryKV()
+    router = EngineRouter(
+        fallback=NoneEngine(),
+        external=ExternalEngine(
+            FakeExternal(),
+            Quota(kv, engine="g", model="m", rpm=100, rpd=100),
+            Breaker(kv, "g"),
+            "m",
+        ),
+        external_enabled=True,
+        allow_degraded=True,
+    )
+    app.dependency_overrides[engine_router] = lambda: router
+    try:
+        second = client.post(
+            "/api/translations", json=body, headers={**auth, "X-Mw-AI-Consent": "1"}
+        ).json()
+    finally:
+        app.dependency_overrides.pop(engine_router, None)
+    assert first["aiModel"].startswith("none/") and second["aiModel"].startswith("gemini_free/")
+    assert second["translationId"] != first["translationId"]
 
 
 @pytest.mark.parametrize("raw", ["01", "%201", "%D9%A1", "%EF%BC%91", "1.0"])
@@ -333,3 +405,79 @@ def test_ai_usage_is_logged_through_configured_handler(capsys: pytest.CaptureFix
     logging.getLogger("mwonmal.ai").info("ai_usage engine=none")
     err = capsys.readouterr().err
     assert err.count("ai_usage engine=none") == 1
+
+
+@pytest.mark.parametrize(
+    "text",
+    [
+        "싱크로율이 높네요",
+        "싱크로나이즈드",
+        "공수부대 출신",
+        "밸류에이션이 높아요",
+        "데일리보고서",
+        "Please align the text",
+    ],
+)
+def test_round2_no_false_positive(text: str) -> None:
+    """레드팀 2차 B-3: 조사처럼 보이는 글자로 시작하는 다른 낱말."""
+    from app.decode.domain.model import DictTerm
+    from app.decode.infra.repository import Dictionary
+
+    terms = {slug: DictTerm(i, slug, slug, PLAIN[slug]) for i, slug in enumerate(PLAIN)}
+    spans = Dictionary(TRIE, terms).spans(text)
+    assert spans == [], [s.matched_text for s in spans]
+
+
+@pytest.mark.parametrize(
+    ("text", "matched"),
+    [
+        ("컨펌받고 진행할게요", "컨펌"),
+        ("컨펌드려요", "컨펌"),
+        ("데드라인전에 끝내요", "데드라인"),
+        ("킥오프중이에요", "킥오프"),
+        ("원온원때 얘기해요", "원온원"),
+        ("피드백좀 주세요", "피드백"),
+        ("스펙대로 해 주세요", "스펙"),
+        ("핫픽스용 브랜치", "핫픽스"),
+        ("디벨롭시켜 주세요", "디벨롭"),
+        ("APIs 정리", "API"),
+        ("컨센서스없이 진행", "컨센서스"),
+    ],
+)
+def test_round2_attached_forms(text: str, matched: str) -> None:
+    """레드팀 2차: 붙여 쓴 조사·활용에서도 용어를 잡는다."""
+    assert [m.matched_text for m in TRIE.find(text)][:1] == [matched]
+
+
+@pytest.mark.parametrize(
+    ("text", "plain"),
+    [
+        ("얼라인 맞춰 주세요", "방향 맞춰 주세요"),
+        ("얼라인해서 알려 주세요", "방향 맞추기를 해서 알려 주세요"),
+        ("드랍하고 가죠", "중단하고 가죠"),
+    ],
+)
+def test_round2_no_verb_overlap(text: str, plain: str) -> None:
+    assert substitute(text, TRIE.find(text), PLAIN) == plain
+
+
+@pytest.mark.parametrize(
+    ("text", "intent"),
+    [
+        ("이건 드랍하고 B안으로 가요.", "DECISION"),
+        ("회사 가요.", "SHARE"),
+        ("확인 부탁드려요", "REQUEST"),
+        ("컨펌 받고 진행할게요", "SHARE"),
+    ],
+)
+def test_round2_intents(text: str, intent: str) -> None:
+    assert rules.intent(text, bool(rules.actions(text, NOW))) == intent
+
+
+@pytest.mark.parametrize("text", ["ㅤ", "ﾠﾠ", "⠀"])
+def test_round2_filler_only_is_400(client: TestClient, fake_apple: FakeApple, text: str) -> None:
+    auth = login(client, fake_apple, "filler")
+    r = client.post(
+        "/api/translations", json={"sourceText": text, "direction": "JARGON_TO_PLAIN"}, headers=auth
+    )
+    assert r.status_code == 400
