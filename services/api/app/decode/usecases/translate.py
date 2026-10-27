@@ -72,15 +72,17 @@ async def translate(
     input_source: str,
     source_image_url: str | None,
     consent: bool,
-) -> int:
+) -> "int | repo.TranslationRow":
+    """재사용이면 기존 id(int), 새로 만들었으면 응답 모양 그대로(다시 읽지 않는다)."""
     # 한글 자모가 풀려 들어온 입력(NFD)도 사전에 맞도록 NFC 로 저장·매칭한다. 인덱스는 저장한 원문
     # 기준.
     source_text = unicodedata.normalize("NFC", source_text)
     if not visible(source_text):
         raise DomainError(ErrorCode.INVALID_INPUT, "문장을 입력해 주세요.", "sourceText")
     project = await repo.resolve_project(s, user_id, project_id)
+    meeting_title = None
     if meeting_id is not None:
-        await repo.check_meeting(s, user_id, project.id, meeting_id)
+        meeting_title = await repo.check_meeting(s, user_id, project.id, meeting_id)
 
     reused = await repo.recent_duplicate(
         s,
@@ -122,4 +124,6 @@ async def translate(
             actions=result.actions,
             spans=tuple(spans),
         ),
+        project_name=project.name,
+        meeting_title=meeting_title,
     )

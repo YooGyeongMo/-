@@ -12,7 +12,7 @@ import sqlalchemy as sa
 from alembic import command
 from alembic.config import Config
 
-from app.all_models import metadata
+from app.core.schema import ACTIVE_TABLES
 
 API_DIR = Path(__file__).resolve().parents[1]
 
@@ -51,7 +51,7 @@ def test_round_trip_and_no_drift(tmp_path: Path, backend: str) -> None:
     cfg = _config(url)
 
     command.upgrade(cfg, "head")
-    assert _tables(url) == set(metadata.tables)
+    assert _tables(url) == set(ACTIVE_TABLES)  # v1.0 은 8테이블(ADR-0021)
     command.downgrade(cfg, "base")
     assert _tables(url) == set()
     command.upgrade(cfg, "head")

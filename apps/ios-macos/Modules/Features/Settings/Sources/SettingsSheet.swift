@@ -40,7 +40,7 @@ public final class SettingsViewModel {
 
 /// 설정(Figma에 시안 없음 → A-09 카드·행 모양을 그대로 씀). AI 외부 전송 옵트인(기본 꺼짐) · 로그아웃 · 정보.
 public struct SettingsSheet: View {
-    @State private var model: SettingsViewModel
+    @ViewModelState private var model: SettingsViewModel
     let nickname: String?
     let email: String?
     let onSignOut: () -> Void
@@ -49,7 +49,7 @@ public struct SettingsSheet: View {
     @State private var confirmSignOut = false
 
     public init(consent: any AIConsentStore, nickname: String?, email: String?, onSignOut: @escaping () -> Void) {
-        _model = State(initialValue: SettingsViewModel(consent: consent))
+        _model = ViewModelState(wrappedValue: SettingsViewModel(consent: consent))
         self.nickname = nickname
         self.email = email
         self.onSignOut = onSignOut

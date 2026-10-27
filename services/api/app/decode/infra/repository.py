@@ -15,6 +15,7 @@ import sqlalchemy as sa
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core import schema
 from app.core.errors import DomainError, ErrorCode
 from app.core.params import offset_of
 from app.core.time import utcnow
@@ -237,6 +238,9 @@ async def ensure_default_project(s: AsyncSession, user_id: int) -> ProjectRef:
 
 
 async def check_meeting(s: AsyncSession, user_id: int, project_id: int, meeting_id: int) -> str:
+    if not schema.has("meetings"):
+        # v1.0 엔 회의가 없다(테이블 단계화, ADR-0021) → 어떤 회의 id 도 없는 것과 같다.
+        raise DomainError(ErrorCode.MEETING_NOT_FOUND, "회의를 찾을 수 없어요.", "meetingId")
     row = (
         await s.execute(
             sa.select(_meetings.c.user_id, _meetings.c.project_id, _meetings.c.title).where(
@@ -325,7 +329,19 @@ def _dec(value: float | None) -> Decimal | None:
     return None if value is None else Decimal(str(round(value, 3)))
 
 
-async def insert_translation(s: AsyncSession, t: NewTranslation) -> int:
+async def insert_translation(
+    s: AsyncSession, t: NewTranslation, *, project_name: str, meeting_title: str | None
+) -> "TranslationRow":
+    """3테이블을 쓰고, 다시 읽지 않고 응답 모양을 바로 만든다(쓰고 다시 읽던 5문을 없앰).
+
+    용어 이름·쉬운 말은 매칭 때 이미 알고 있고(Span), 할 일 id 는 flush 가 채운다.
+    새로 만든 해석의 용어는 아직 아무도 카드로 담지 않았을 수 있지만, 사용자가 예전에 담은 용어일
+    수 있어
+    카드 표가 있으면 한 번만 확인한다.
+    """
+    # MySQL DATETIME 은 초 단위라 마이크로초를 반올림한다
+    # → 응답(초 단위 버림)과 1초 어긋난다(QA #4).
+    now = utcnow().replace(microsecond=0)
     row = Translation(
         user_id=t.user_id,
         project_id=t.project_id,
@@ -343,36 +359,79 @@ async def insert_translation(s: AsyncSession, t: NewTranslation) -> int:
         nuance_confidence=_dec(t.nuance_confidence),
         ai_model=t.ai_model[:50],
         latency_ms=t.latency_ms,
-        created_at=utcnow(),
+        created_at=now,
     )
     s.add(row)
     await s.flush()
-    for i, a in enumerate(t.actions, start=1):
-        s.add(
-            TranslationAction(
-                translation_id=row.id,
-                sort_order=i,
-                action_text=a.text,
-                due_hint=a.due_hint,
-                due_at=a.due_at,
-                created_at=utcnow(),
-            )
+    actions = [
+        TranslationAction(
+            translation_id=row.id,
+            sort_order=i,
+            action_text=a.text,
+            due_hint=a.due_hint,
+            due_at=a.due_at,
+            is_checked=False,
+            alert_enabled=True,
+            created_at=now,
         )
-    for sp in t.spans:
-        s.add(
-            TranslationTerm(
-                translation_id=row.id,
+        for i, a in enumerate(t.actions, start=1)
+    ]
+    terms = [
+        TranslationTerm(
+            translation_id=row.id,
+            term_id=sp.term_id,
+            ai_term_ko=None if sp.term_id is not None else sp.term_ko[:100],
+            ai_plain_ko=None if sp.term_id is not None else sp.plain_ko[:200],
+            matched_text=sp.matched_text[:100],
+            start_index=sp.start,
+            end_index=sp.end,
+            confidence=_dec(sp.confidence) or Decimal("0"),
+        )
+        for sp in t.spans
+    ]
+    s.add_all([*actions, *terms])
+    if actions or terms:
+        await s.flush()
+    carded = await _card_term_ids(
+        s, t.user_id, [sp.term_id for sp in t.spans if sp.term_id is not None]
+    )
+    return TranslationRow(
+        id=row.id,
+        user_id=t.user_id,
+        project_id=t.project_id,
+        project_name=project_name,
+        meeting_id=t.meeting_id,
+        meeting_title=meeting_title,
+        source_type="MESSAGE",
+        input_source=t.input_source,
+        direction=t.direction,
+        source_text=t.source_text,
+        result_text=row.result_text,
+        jargon_count=len(t.spans),
+        intent=t.intent,
+        nuance_note=t.nuance_note,
+        nuance_tip=t.nuance_tip,
+        nuance_confidence=None if row.nuance_confidence is None else float(row.nuance_confidence),
+        ai_model=row.ai_model,
+        latency_ms=t.latency_ms,
+        created_at=now,
+        actions=tuple(_action(a) for a in actions),
+        terms=tuple(
+            TermRow(
+                # GET(get_translation)과 같은 규칙: 저장한 값 그대로, 비면 원문 표기로.
                 term_id=sp.term_id,
-                ai_term_ko=None if sp.term_id is not None else sp.term_ko[:100],
-                ai_plain_ko=None if sp.term_id is not None else sp.plain_ko[:200],
+                term_ko=(sp.term_ko if sp.term_id is not None else sp.term_ko[:100])
+                or sp.matched_text[:100],
+                plain_ko=sp.plain_ko if sp.term_id is not None else sp.plain_ko[:200],
                 matched_text=sp.matched_text[:100],
-                start_index=sp.start,
-                end_index=sp.end,
-                confidence=_dec(sp.confidence) or Decimal("0"),
+                start=sp.start,
+                end=sp.end,
+                confidence=float(_dec(sp.confidence) or 0),
+                in_my_cards=sp.term_id in carded,
             )
-        )
-    await s.flush()
-    return int(row.id)
+            for sp in t.spans
+        ),
+    )
 
 
 @dataclass(frozen=True)
@@ -438,8 +497,8 @@ def _action(a: TranslationAction) -> ActionRow:
 
 
 async def _card_term_ids(s: AsyncSession, user_id: int, term_ids: list[int]) -> set[int]:
-    if not term_ids:
-        return set()
+    if not term_ids or not schema.has("cards"):
+        return set()  # v1.0 엔 카드가 없다(ADR-0021) → 질의도 하지 않는다
     rows = await s.execute(
         sa.select(_cards.c.term_id).where(
             _cards.c.user_id == user_id, _cards.c.term_id.in_(term_ids)
@@ -449,16 +508,21 @@ async def _card_term_ids(s: AsyncSession, user_id: int, term_ids: list[int]) -> 
 
 
 async def get_translation(s: AsyncSession, translation_id: int, user_id: int) -> TranslationRow:
-    t = await s.get(Translation, translation_id)
-    if t is None:
+    """해석 + 프로젝트 이름(조인 1) · 할 일(1) · 용어(1) · [카드(1, v1.1~)] — 예전 5~6문 → 3문."""
+    head = (
+        await s.execute(
+            sa.select(Translation, _projects.c.name)
+            .outerjoin(_projects, _projects.c.id == Translation.project_id)
+            .where(Translation.id == translation_id)
+        )
+    ).first()
+    if head is None:
         raise DomainError(ErrorCode.TRANSLATION_NOT_FOUND, "해석 기록을 찾을 수 없어요.")
+    t, project_name = head
     if t.user_id != user_id:
         raise DomainError(ErrorCode.NOT_OWNER, "내 해석 기록이 아니에요.")
-    project_name = (
-        await s.execute(sa.select(_projects.c.name).where(_projects.c.id == t.project_id))
-    ).scalar() or ""
     meeting_title = None
-    if t.meeting_id is not None:
+    if t.meeting_id is not None and schema.has("meetings"):
         meeting_title = (
             await s.execute(sa.select(_meetings.c.title).where(_meetings.c.id == t.meeting_id))
         ).scalar()
@@ -497,7 +561,7 @@ async def get_translation(s: AsyncSession, translation_id: int, user_id: int) ->
         id=t.id,
         user_id=t.user_id,
         project_id=t.project_id,
-        project_name=project_name,
+        project_name=project_name or "",
         meeting_id=t.meeting_id,
         meeting_title=meeting_title,
         source_type=t.source_type,
@@ -553,13 +617,17 @@ async def list_translations(
         where.append(Translation.meeting_id == meeting)
     if direction is not None:
         where.append(Translation.direction == direction)
+    # 전체 개수는 따로 센다. `count() over()` 로 합치면 왕복은 1번 줄지만 LIMIT 전에
+    # 조건에 맞는 행을 전부 읽는다((user_id, created_at) 인덱스로 20행에서 멈추던 게
+    # 멈추지 않는다) → 기록이 쌓일수록 느려진다(측정 2026-10-27, ADR-0021 §성능).
+    # COUNT 는 같은 인덱스만 훑는다.
     total = int(
         (
             await s.execute(sa.select(sa.func.count()).select_from(Translation).where(*where))
         ).scalar_one()
     )
     off = offset_of(page, size)
-    if off is None:
+    if off is None or total == 0:
         return [], total
     acount = (
         sa.select(sa.func.count())
@@ -613,15 +681,20 @@ async def delete_translation(s: AsyncSession, translation_id: int, user_id: int)
         raise DomainError(ErrorCode.NOT_OWNER, "내 해석 기록이 아니에요.")
     await s.execute(sa.delete(TranslationAction).where(TranslationAction.translation_id == t.id))
     await s.execute(sa.delete(TranslationTerm).where(TranslationTerm.translation_id == t.id))
-    # 카드·녹음은 남기고 출처만 끊는다(원문이 사라져도 외운 말은 남는다).
-    await s.execute(
-        _cards.update()
-        .where(_cards.c.source_translation_id == t.id)
-        .values(source_translation_id=None)
-    )
-    await s.execute(
-        _recordings.update().where(_recordings.c.translation_id == t.id).values(translation_id=None)
-    )
+    # 카드·녹음은 남기고 출처만 끊는다(원문이 사라져도 외운 말은 남는다). 표가 열린
+    # 뒤에만(ADR-0021).
+    if schema.has("cards"):
+        await s.execute(
+            _cards.update()
+            .where(_cards.c.source_translation_id == t.id)
+            .values(source_translation_id=None)
+        )
+    if schema.has("meeting_recordings"):
+        await s.execute(
+            _recordings.update()
+            .where(_recordings.c.translation_id == t.id)
+            .values(translation_id=None)
+        )
     await s.delete(t)
 
 
@@ -681,9 +754,8 @@ async def list_actions(
         where.append(Translation.project_id == project_id)
     if meeting_id is not None:
         where.append(Translation.meeting_id == meeting_id)
-    base = sa.select(TranslationAction).join(
-        Translation, Translation.id == TranslationAction.translation_id
-    )
+
+    # 전체 개수는 따로(창 함수는 LIMIT 전에 전부 읽는다 — list_translations 주석 참고).
     total = int(
         (
             await s.execute(
@@ -695,21 +767,28 @@ async def list_actions(
         ).scalar_one()
     )
     off = offset_of(page, size)
-    if off is None:
+    if off is None or total == 0:
         return [], total
+    # 회의 이름은 회의 표가 열린 뒤에만 붙인다(ADR-0021).
+    title = _meetings.c.title if schema.has("meetings") else sa.null()
+    q = (
+        sa.select(
+            TranslationAction,
+            Translation.project_id,
+            _projects.c.name,
+            Translation.meeting_id,
+            title,
+            Translation.source_text,
+        )
+        .join(Translation, Translation.id == TranslationAction.translation_id)
+        .outerjoin(_projects, _projects.c.id == Translation.project_id)
+    )
+    if schema.has("meetings"):
+        q = q.outerjoin(_meetings, _meetings.c.id == Translation.meeting_id)
     # 기한 있는 것 먼저(가까운 순), 그다음 최근 해석 순.
     rows = (
         await s.execute(
-            base.add_columns(
-                Translation.project_id,
-                _projects.c.name,
-                Translation.meeting_id,
-                _meetings.c.title,
-                Translation.source_text,
-            )
-            .outerjoin(_projects, _projects.c.id == Translation.project_id)
-            .outerjoin(_meetings, _meetings.c.id == Translation.meeting_id)
-            .where(*where)
+            q.where(*where)
             .order_by(
                 TranslationAction.due_at.is_(None),
                 TranslationAction.due_at,
@@ -741,13 +820,26 @@ class TermDetailRow:
 
 
 async def get_term(s: AsyncSession, term_id: int, user_id: int | None) -> TermDetailRow:
-    t = await s.get(Term, term_id)
-    if t is None or t.status != "APPROVED":
+    """조회수 +1(1) · 용어 + 작성자(조인 1) · 예문 5개(1) · [내 카드(1, v1.1~)] — 예전 6문 → 3문."""
+    # 조회수를 **먼저** 올리고 읽는다: 같은 트랜잭션의 내 UPDATE 뒤 SELECT 는 방금 쓴 최신 값을 본다
+    # (먼저 읽고 +1 하면 동시에 본 두 요청이 같은 N+1 을 돌려준다, QA #5). 없는 용어면 0행 갱신.
+    await s.execute(
+        sa.update(Term)
+        .where(Term.id == term_id, Term.status == "APPROVED")
+        .values(view_count=Term.view_count + 1)
+        .execution_options(synchronize_session=False)
+    )
+    head = (
+        await s.execute(
+            sa.select(Term, _users.c.nickname)
+            .outerjoin(_users, _users.c.id == Term.created_by)
+            .where(Term.id == term_id)
+            .execution_options(populate_existing=True)
+        )
+    ).first()
+    if head is None or head[0].status != "APPROVED":
         raise DomainError(ErrorCode.TERM_NOT_FOUND, "용어를 찾을 수 없어요.")
-    await s.execute(sa.update(Term).where(Term.id == t.id).values(view_count=Term.view_count + 1))
-    nickname = (
-        await s.execute(sa.select(_users.c.nickname).where(_users.c.id == t.created_by))
-    ).scalar() or ""
+    t, nickname = head
     ex_rows = (
         await s.execute(
             sa.select(TermExample, _users.c.nickname)
@@ -758,7 +850,7 @@ async def get_term(s: AsyncSession, term_id: int, user_id: int | None) -> TermDe
         )
     ).all()
     card = None
-    if user_id is not None:
+    if user_id is not None and schema.has("cards"):
         row = (
             await s.execute(
                 sa.select(
@@ -772,5 +864,4 @@ async def get_term(s: AsyncSession, term_id: int, user_id: int | None) -> TermDe
         ).first()
         if row is not None:
             card = dict(row._mapping)
-    await s.refresh(t)
-    return TermDetailRow(t, nickname, tuple((e, n or "") for e, n in ex_rows), card)
+    return TermDetailRow(t, nickname or "", tuple((e, n or "") for e, n in ex_rows), card)

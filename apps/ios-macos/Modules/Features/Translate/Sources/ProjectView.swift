@@ -8,14 +8,14 @@ import SwiftUI
 /// 머리: 파란 아이콘 34 + 이름 22 Bold + 설명 13. 버튼 둘: 판교어 해석(흰) · 새 회의(파랑, v1.2 안내).
 /// 세 칸 고르기(44 높이, 흰 60% 바탕, 고른 칸 흰색): 해석 N · 할 일 N · 모르는 말 N.
 public struct ProjectRootView: View {
-    @State private var model: ProjectViewModel
+    @ViewModelState private var model: ProjectViewModel
     let refreshKey: Int
     let onNotice: (LocalizedStringKey) -> Void
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
 
     public init(dependencies: TranslateDependencies, refreshKey: Int = 0, onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }) {
-        _model = State(initialValue: ProjectViewModel(dependencies: dependencies))
+        _model = ViewModelState(wrappedValue: ProjectViewModel(dependencies: dependencies))
         self.refreshKey = refreshKey
         self.onNotice = onNotice
     }

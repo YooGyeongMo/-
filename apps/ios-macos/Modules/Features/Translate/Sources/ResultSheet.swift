@@ -8,7 +8,7 @@ import SwiftUI
 /// 머리(출처 칩·닫기) → "해석 결과" 22 Bold → 출처·시각 → 원문+쉬운 말 카드 → 숨은 뜻 카드 → 나한테 시킨 일 →
 /// 복습 카드로 담은 말 칩 → 아래 고정 버튼 "모르는 말 모두 복습 카드로"(카드는 v1.1 → 안내).
 public struct ResultSheet: View {
-    @State private var model: ResultViewModel
+    @ViewModelState private var model: ResultViewModel
     let onNotice: (LocalizedStringKey) -> Void
     let onChange: () -> Void
     @Environment(AppRouter.self) private var router
@@ -21,7 +21,11 @@ public struct ResultSheet: View {
         onChange: @escaping () -> Void = {},
         onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }
     ) {
-        _model = State(initialValue: ResultViewModel(translationId: translationId, dependencies: dependencies, prefetched: prefetched))
+        _model = ViewModelState(wrappedValue: ResultViewModel(
+            translationId: translationId,
+            dependencies: dependencies,
+            prefetched: prefetched
+        ))
         self.onChange = onChange
         self.onNotice = onNotice
     }

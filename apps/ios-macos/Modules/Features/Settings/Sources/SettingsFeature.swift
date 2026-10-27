@@ -111,7 +111,7 @@ struct LevelRowSpec {
 /// A-09 MY(Figma 51:2731): 노을 배경, 오른쪽 위 설정(44 유리 원), 프로필 64 + 이름 22 + 직군·연속 + 숫자 줄,
 /// 판교 등급 목록(지난 = 초록 ✓, 지금 = "지금", 잠긴 = 회색 + 자물쇠), 퇴근길 복습·프로젝트 행.
 public struct MyRootView: View {
-    @State private var model: MyViewModel
+    @ViewModelState private var model: MyViewModel
     let user: UserProfile?
     let refreshKey: Int
     let onNotice: (LocalizedStringKey) -> Void
@@ -124,7 +124,7 @@ public struct MyRootView: View {
         refreshKey: Int = 0,
         onNotice: @escaping (LocalizedStringKey) -> Void = { _ in }
     ) {
-        _model = State(initialValue: MyViewModel(repository: dependencies.repository))
+        _model = ViewModelState(wrappedValue: MyViewModel(repository: dependencies.repository))
         self.user = user
         self.refreshKey = refreshKey
         self.onNotice = onNotice

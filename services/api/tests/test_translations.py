@@ -423,6 +423,57 @@ def test_gemini_adapter_parses_and_hides_provider_body() -> None:
     assert e.value.reason == "http_500" and "secret" not in str(e.value)
 
 
+def test_gemini_drops_blank_new_terms_after_trim() -> None:
+    """QA: 공백뿐인 termKo 는 다듬으면 빈 값 → 버린다(POST 와 GET 이 달라지던 원인)."""
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        data = {
+            "resultText": "해 주세요",
+            "intentType": "REQUEST",
+            "nuance": None,
+            "actionItems": [],
+            "newTerms": [
+                {"termKo": "   ", "plainKo": "해 주세요", "matchedText": "쳐주세요"},
+                {"termKo": "얼라인", "plainKo": "  ", "matchedText": "얼라인"},
+                {"termKo": "싱크", "plainKo": "맞추기", "matchedText": "싱크"},
+            ],
+        }
+        return httpx.Response(
+            200, json={"candidates": [{"content": {"parts": [{"text": json.dumps(data)}]}}]}
+        )
+
+    engine = GeminiEngine(
+        httpx.AsyncClient(transport=httpx.MockTransport(handler)), api_key="k", model="m", timeout=1
+    )
+    import anyio
+
+    req = EngineRequest("싱크 쳐주세요", "JARGON_TO_PLAIN", (), datetime(2026, 10, 27, 1))
+    result = anyio.run(engine.decode, req)
+    assert [t.term_ko for t in result.new_terms] == ["싱크"]
+
+
+def test_post_body_equals_get_body(client: TestClient, fake_apple: FakeApple) -> None:
+    """해석 저장 응답은 다시 읽지 않고 만든다(ADR-0021 §성능) → 바로 GET 한 것과 같아야 한다."""
+    h = login(client, fake_apple)
+    made = client.post(
+        "/api/translations",
+        json={
+            "sourceText": "이번 스프린트 스코프 아웃하고 내일까지 얼라인 쳐주세요",
+            "direction": "JARGON_TO_PLAIN",
+        },
+        headers=h,
+    )
+    assert made.status_code == 201
+    got = client.get(f"/api/translations/{made.json()['translationId']}", headers=h)
+    assert got.json() == made.json()
+
+
+def test_term_view_count_reads_after_increment(client: TestClient, fake_apple: FakeApple) -> None:
+    h = login(client, fake_apple)
+    counts = [client.get("/api/terms/1", headers=h).json()["viewCount"] for _ in range(3)]
+    assert counts == [counts[0], counts[0] + 1, counts[0] + 2] and counts[0] >= 1
+
+
 # ---------- 개발용 로그인 ----------
 
 

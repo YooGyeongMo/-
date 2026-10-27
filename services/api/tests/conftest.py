@@ -15,7 +15,7 @@ from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from fastapi.testclient import TestClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
-from app.all_models import metadata
+from app.all_models import active_metadata
 from app.core.db import session
 from app.decode.infra.repository import reset_dictionary_cache
 from app.decode.infra.seed import seed
@@ -120,7 +120,7 @@ def client(tmp_path: Path, fake_apple: FakeApple) -> Iterator[TestClient]:
 
 async def _create_all(engine: Any) -> None:
     async with engine.begin() as conn:
-        await conn.run_sync(metadata.create_all)
+        await conn.run_sync(active_metadata().create_all)
         await conn.run_sync(seed)
     reset_dictionary_cache()
 

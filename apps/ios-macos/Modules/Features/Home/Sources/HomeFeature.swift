@@ -84,7 +84,7 @@ public final class HomeViewModel {
 
 /// A-01 홈(Figma 51:1272). 히어로 300 위에 프로젝트 칩·등급 카드, 날짜·"오늘", 퇴근길 복습 카드, 다가오는 할 일.
 public struct HomeRootView: View {
-    @State private var model: HomeViewModel
+    @ViewModelState private var model: HomeViewModel
     let user: UserProfile?
     let onNotice: (LocalizedStringKey) -> Void
     let refreshKey: Int
@@ -92,9 +92,14 @@ public struct HomeRootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
 
-    public init(model: HomeViewModel, user: UserProfile?, refreshKey: Int = 0, onNotice: @escaping (LocalizedStringKey) -> Void = { _ in
-    }) {
-        _model = State(initialValue: model)
+    public init(
+        model: @autoclosure @escaping () -> HomeViewModel,
+        user: UserProfile?,
+        refreshKey: Int = 0,
+        onNotice: @escaping (LocalizedStringKey) -> Void = { _ in
+        }
+    ) {
+        _model = ViewModelState(wrappedValue: model())
         self.user = user
         self.refreshKey = refreshKey
         self.onNotice = onNotice

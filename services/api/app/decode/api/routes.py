@@ -186,7 +186,7 @@ async def create_translation(
     engines: EngineRouterDep,
     consent_header: Annotated[str | None, Header(alias="X-Mw-AI-Consent")] = None,
 ) -> dict[str, Any]:
-    translation_id = await translate(
+    made = await translate(
         db,
         engines,
         user_id=principal.user_id,
@@ -198,7 +198,9 @@ async def create_translation(
         source_image_url=body.sourceImageUrl,
         consent=consent_header == "1",
     )
-    return translation_body(await repo.get_translation(db, translation_id, principal.user_id))
+    if isinstance(made, int):  # 10분 안 같은 문장 → 기존 기록을 그대로 읽는다
+        made = await repo.get_translation(db, made, principal.user_id)
+    return translation_body(made)
 
 
 def _meeting_filter(raw: str | None) -> int | str | None:
