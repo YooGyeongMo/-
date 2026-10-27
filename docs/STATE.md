@@ -61,6 +61,7 @@
 | 면접 대비(코드 기준 Q&A) | `docs/interview/2026-10-27-ios-backend-interview.md` (+ 같은 이름 PDF) |
 | 앱 구조 | ADR-0016 + `apps/ios-macos/Tuist/ProjectDescriptionHelpers/Module.swift` (12번 문서의 Coordinator 서술은 개정 전 기록) |
 | 디자인 토큰·글래스 | ADR-0017, `Modules/Core/MwonmalUI/Resources/Colors.xcassets` |
+| 디자인 시스템(Figma) | Figma 파일 Nid06Km1ATfAQxqgWdZ9tt 페이지 `DS · 개요 / 기초 / 커스텀 컴포넌트 / 아이콘·일러스트 / 네이티브` — 색 변수 "Mw Color" 38개×4모드(iOS 코드 문법 = MwColor.xxx), 그림자 스타일 5, 컴포넌트 16(변형 포함), 아이콘 29. 글자 스타일은 Pretendard를 원격 연결에서 못 불러 수치표만 |
 | 서버·AI·비용 | `docs/design/14_시스템_설계서.md`, ADR-0015 |
 | 일정 | `docs/16_실행계획.md` §0 (v3) |
 | 일지 | `docs/log/2026-10-26.md` |

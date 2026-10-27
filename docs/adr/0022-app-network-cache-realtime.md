@@ -63,7 +63,7 @@ v1.2 녹음(최대 200MB) 백그라운드 업로드는 **어느 쪽도 해결하
 - `@Observable` 모델: 뷰는 **읽은 프로퍼티가 바뀔 때만** 다시 그린다(ObservableObject의 "아무 @Published나 바뀌면 전부"와 다름).
 - `@ViewModelState`: `_model = State(initialValue: VM(...))`는 부모가 다시 그릴 때마다(토스트·키보드·탭 바 인셋) VM을 새로 만들고 버린다. 만드는 식을 autoclosure로 받아 **처음 읽을 때 한 번만** 실행한다. `AppRouter`·`AppSession.live()`(Keychain·URLSession 조립)도 같다.
 - 그림자: 카드 그림자는 행마다 오프스크린 패스를 만든다. 목록은 `LazyVStack`이라 보이는 행만 그린다. 그림자 반경은 Figma 값(blur/2)이다. 스크롤 프레임 드랍이 측정되면 그 카드만 `compositingGroup()`으로 묶는다(지금은 측정 전이라 넣지 않음 — 넣으면 레이어 메모리가 는다).
-- 글꼴 크기·여백은 `mwScale`(기기 폭 / 402) 하나로 비례. 레이아웃 재계산은 폭이 바뀔 때만(`onGeometryChange`).
+- 글꼴 크기·여백은 `mwScale`(기기 폭 / 393, Figma 기준 프레임 iPhone 16·17 Pro) 하나로 비례. 레이아웃 재계산은 폭이 바뀔 때만(`onGeometryChange`).
 
 ## 실시간·소켓
 
