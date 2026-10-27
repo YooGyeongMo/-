@@ -187,7 +187,7 @@ public struct ViewModelState<Model: AnyObject & Observable>: DynamicProperty {
 
 - 목록은 `LazyVStack` → 보이는 행만 만든다. 다음 페이지는 마지막 행의 `.task`에서(`loadMoreIfNeeded`).
 - 그림자는 행마다 오프스크린 패스가 든다. 측정 전에 `compositingGroup()`/`drawingGroup()`을 넣지 않은 이유: 레이어 메모리가 늘고, 텍스트가 래스터가 되어 접근성 확대·다이내믹 타입에 불리하다. 프레임 드랍이 Instruments로 확인되면 그 카드만.
-- 크기는 `mwScale`(기기 폭/402) 하나로 비례. 폭이 바뀔 때만 다시 계산(`onGeometryChange`).
+- 크기는 `mwScale`(기기 폭/393, Figma 기준 프레임 393×852) 하나로 비례. 폭이 바뀔 때만 다시 계산(`onGeometryChange`).
 - 키보드가 올라와 안전 영역이 커질 때 탭 바가 같이 밀리던 것(QA)은 인셋 60 이하만 받아 막았다.
 
 **꼬리 질문.** *`@Observable`인데도 리스트 전체가 다시 그려지는 경우?* 배열 자체를 바꾸면 그 배열을 읽은 뷰는 다시 그린다. 행 단위 갱신이 필요하면 행을 별도 `@Observable` 객체로 만들거나 `id`가 안정적인 `ForEach`를 쓴다(우리는 `Identifiable` id = 서버 id).
@@ -254,7 +254,7 @@ public struct ViewModelState<Model: AnyObject & Observable>: DynamicProperty {
 | 3 | 401이 여러 요청에서 동시에 오면 로그인 화면이 여러 번? | actor 신호가 1번만. 상태를 먼저 바꿔 두 번째부터는 guard에서 멈춤 |
 | 4 | 할 일 체크가 서버 저장에 실패하면? | 먼저 화면을 바꾸고(낙관적 갱신), 실패하면 그 행과 남은 개수를 옛 값으로 되돌리고 토스트(`HomeViewModel.toggle`). 401이면 재로그인 흐름으로 |
 | 5 | 페이지네이션 중 새 기록이 생기면 중복? | 오프셋 방식이라 한 칸 밀릴 수 있다. v1.0은 목록 맨 위 새로고침으로 해결, 무한 스크롤이 길어지면 커서(`created_at,id`) 방식 |
-| 6 | 아이폰 SE ~ Pro Max에서 같은 비율? | Figma 402pt 기준 `mwScale = 폭/402`. 텍스트·여백·아이콘이 같이 커진다. 단위 테스트는 CI에서 iPhone SE(iOS 17.0)·최신 iPhone 둘 다, E2E는 iPhone 17 Pro |
+| 6 | 아이폰 SE ~ Pro Max에서 같은 비율? | Figma 393pt 기준 `mwScale = 폭/393`(SE 375 → 0.954, Pro Max 440 → 1.12). 텍스트·여백·아이콘이 같이 커진다. 단위 테스트는 CI에서 iPhone SE(iOS 17.0)·최신 iPhone 둘 다, E2E는 iPhone 17 Pro |
 | 7 | 오프라인으로 앱을 켜면? | 토큰은 있으면 `unverified`로 들어가 탭은 보이고, 요청은 바로 실패(`waitsForConnectivity=false`) → "연결 없음" 카드. 다시 닿으면 `reloadProfile`로 회복 |
 | 8 | 다크 모드·다이내믹 타입? | 색은 토큰(`MwColor`, 색 38개 중 35개가 라이트·다크 쌍). 글꼴은 `mwFont`가 기기 배율 × `@ScaledMetric`(시스템 글자 크기)를 곱한다 |
 | 9 | 계약이 바뀌면 앱·서버 중 누가 먼저 깨지나? | 앱은 생성 코드 컴파일 에러, 서버는 schemathesis 계약 검사(1,083 케이스) CI 실패. 둘 다 머지 전 |
