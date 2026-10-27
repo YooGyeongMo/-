@@ -20,3 +20,15 @@ def current_principal(
 
 
 CurrentPrincipal = Annotated[Principal, Depends(current_principal)]
+
+
+def optional_principal(
+    creds: Annotated[HTTPAuthorizationCredentials | None, Depends(_bearer)],
+) -> Principal | None:
+    """로그인이 선택인 조회(getTerm). 토큰이 있으면 검증하고, 틀리면 401."""
+    if creds is None:
+        return None
+    return current_principal(creds)
+
+
+OptionalPrincipal = Annotated[Principal | None, Depends(optional_principal)]

@@ -14,3 +14,18 @@ validate-formats = false
 [[operations]]
 include-operation-id = "oauthLogin"
 parameters = { provider = "apple" }
+
+# 4) 목록 조회(getTranslations·getActions·getProjects)는 계약 v1.0 응답이 200·401 뿐이라 잘못된 쿼리
+#    (page=-1, 모르는 쿼리 키)에 낼 400 이 계약에 없다. 서버는 400 으로 막는 것이 맞으므로 음수 데이터
+#    검사는 이 세 연산에서만 끄고 양수(계약에 맞는 값) 검사만 돈다. 400 추가는 v1.1 #75.
+[[operations]]
+include-operation-id = "getTranslations"
+generation = { mode = "positive" }
+
+[[operations]]
+include-operation-id = "getActions"
+generation = { mode = "positive" }
+
+[[operations]]
+include-operation-id = "getProjects"
+generation = { mode = "positive" }

@@ -28,6 +28,28 @@ struct DictionaryTrieTests {
         #expect(trie.find(in: "인싱크로", boundary: false).map(\.range) == [span(1, 3)])
     }
 
+    /// 서버(`services/api/app/decode/domain/matching.py`)와 같은 정답 벡터. 규칙이 한쪽만 바뀌면 여기서 깨진다.
+    @Test func sharedVectorsMatchServer() throws {
+        let url = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent() // JargonDetectionTests
+            .deletingLastPathComponent() // Tests
+            .deletingLastPathComponent() // MwonmalIntelligence
+            .deletingLastPathComponent() // Packages
+            .deletingLastPathComponent() // ios-macos
+            .deletingLastPathComponent() // apps
+            .deletingLastPathComponent() // 저장소 루트
+            .appendingPathComponent("packages/test-vectors/jargon_match.json")
+        let vectors = try JSONDecoder().decode(MatchVectors.self, from: Data(contentsOf: url))
+        let trie = DictionaryTrie(terms: vectors.dictionary.keys)
+        for vector in vectors.cases {
+            let got: [String] = trie.find(in: vector.text).map { span in
+                "\(span.range.start),\(span.range.end),\(vectors.dictionary[span.termKey ?? ""] ?? "?")"
+            }
+            let want: [String] = vector.spans.map { parts in parts.map(\.text).joined(separator: ",") }
+            #expect(got == want, "\(vector.text)")
+        }
+    }
+
     @Test func bundledSeedLoads() throws {
         let seed = try HybridJargonDetector.bundledSeedTrie()
         #expect(seed.termCount >= 12)
@@ -132,4 +154,28 @@ struct ParityRow: Decodable {
     let tokens: [String]
     let gold: [[Int]]
     let expectedPred: [String]
+}
+
+/// `packages/test-vectors/jargon_match.json` 모양. spans 항목은 [시작, 끝, 키](숫자·문자 섞임).
+private struct MatchVectors: Decodable {
+    let dictionary: [String: String]
+    let cases: [MatchCase]
+}
+
+private struct MatchCase: Decodable {
+    let text: String
+    let spans: [[MatchPart]]
+}
+
+private struct MatchPart: Decodable {
+    let text: String
+
+    init(from decoder: any Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if let number = try? container.decode(Int.self) {
+            text = String(number)
+        } else {
+            text = try container.decode(String.self)
+        }
+    }
 }

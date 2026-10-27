@@ -1,0 +1,235 @@
+{
+ "_doc": "사전 매칭 정답(#12). 인덱스 = 유니코드 스칼라 위치, end 는 포함하지 않음. 서버 decode/domain/matching.py 와 앱 DictionaryTrie 가 같이 읽는다. dictionary = 표기 → 키. 끝 경계: 라틴 뒤 라틴 금지(복수 s 하나는 허용), 한글 뒤에는 활용(VERB_STEMS) 또는 낱말 경계에서 끝나는 조사 사슬(PARTICLES)만.",
+ "dictionary": {
+  "얼라인": "align",
+  "align": "align",
+  "스코프 아웃": "scope-out",
+  "스코프": "scope",
+  "넥스트": "next",
+  "R&R": "r-and-r",
+  "팔로업": "follow-up",
+  "챌린지": "challenge",
+  "싱크": "sync",
+  "ASAP": "asap",
+  "킥오프": "kick-off",
+  "컨펌": "confirm",
+  "데드라인": "deadline",
+  "API": "api",
+  "공수": "man-month",
+  "밸류": "value"
+ },
+ "cases": [
+  {
+   "text": "이번 스프린트 스코프 아웃하고 넥스트로 밀죠. 그 전에 R&R 정리해서 얼라인 쳐주세요",
+   "spans": [
+    [
+     8,
+     14,
+     "scope-out"
+    ],
+    [
+     17,
+     20,
+     "next"
+    ],
+    [
+     31,
+     34,
+     "r-and-r"
+    ],
+    [
+     40,
+     43,
+     "align"
+    ]
+   ]
+  },
+  {
+   "text": "그건 좀 챌린지가 있을 것 같은데요. 일단 팔로업할게요",
+   "spans": [
+    [
+     5,
+     8,
+     "challenge"
+    ],
+    [
+     24,
+     27,
+     "follow-up"
+    ]
+   ]
+  },
+  {
+   "text": "오늘 점심 뭐 드실래요",
+   "spans": []
+  },
+  {
+   "text": "스코프가 넓어요",
+   "spans": [
+    [
+     0,
+     3,
+     "scope"
+    ]
+   ]
+  },
+  {
+   "text": "컨얼라인은 단어 중간이라 아님",
+   "spans": []
+  },
+  {
+   "text": "Xalign 도 아니고 align 은 맞음",
+   "spans": [
+    [
+     13,
+     18,
+     "align"
+    ]
+   ]
+  },
+  {
+   "text": "asap 으로 싱크해서 킥오프!",
+   "spans": [
+    [
+     0,
+     4,
+     "asap"
+    ],
+    [
+     8,
+     10,
+     "sync"
+    ],
+    [
+     13,
+     16,
+     "kick-off"
+    ]
+   ]
+  },
+  {
+   "text": "👍 얼라인 완료",
+   "spans": [
+    [
+     2,
+     5,
+     "align"
+    ]
+   ]
+  },
+  {
+   "text": "(얼라인)",
+   "spans": [
+    [
+     1,
+     4,
+     "align"
+    ]
+   ]
+  },
+  {
+   "text": "싱크대에 물이 새요",
+   "spans": []
+  },
+  {
+   "text": "싱크해서 알려 주세요",
+   "spans": [
+    [
+     0,
+     2,
+     "sync"
+    ]
+   ]
+  },
+  {
+   "text": "얼라인쳐 주세요",
+   "spans": [
+    [
+     0,
+     3,
+     "align"
+    ]
+   ]
+  },
+  {
+   "text": "alignment 말고 align",
+   "spans": [
+    [
+     13,
+     18,
+     "align"
+    ]
+   ]
+  },
+  {
+   "text": "R&R이 정해졌어요",
+   "spans": [
+    [
+     0,
+     3,
+     "r-and-r"
+    ]
+   ]
+  },
+  {
+   "text": "넥스트로 밀죠",
+   "spans": [
+    [
+     0,
+     3,
+     "next"
+    ]
+   ]
+  },
+  {
+   "text": "넥스트북 샀어요",
+   "spans": []
+  },
+  {
+   "text": "싱크로율이 높네요",
+   "spans": []
+  },
+  {
+   "text": "공수부대 출신",
+   "spans": []
+  },
+  {
+   "text": "밸류에이션이 높아요",
+   "spans": []
+  },
+  {
+   "text": "컨펌받고 진행",
+   "spans": [
+    [
+     0,
+     2,
+     "confirm"
+    ]
+   ]
+  },
+  {
+   "text": "데드라인전에 끝내요",
+   "spans": [
+    [
+     0,
+     4,
+     "deadline"
+    ]
+   ]
+  },
+  {
+   "text": "APIs 정리",
+   "spans": [
+    [
+     0,
+     3,
+     "api"
+    ]
+   ]
+  },
+  {
+   "text": "APIX 아님",
+   "spans": []
+  }
+ ]
+}

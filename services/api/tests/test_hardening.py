@@ -190,6 +190,7 @@ def test_startup_ok_with_real_key_in_prod(
     ).decode()
     monkeypatch.setattr(settings, "env", "prod")
     monkeypatch.setattr(settings, "jwt_private_key", pem)
+    monkeypatch.setattr(settings, "redis_url", "redis://redis:6379/0")
     security.check_keys()
     tok = security.issue_token(7, "MEMBER")
     assert security.verify_token(tok).user_id == 7
