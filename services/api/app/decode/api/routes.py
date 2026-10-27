@@ -90,6 +90,10 @@ class ActionUpdateRequest(BaseModel):
 
     @model_validator(mode="after")
     def _at_least_one(self) -> "ActionUpdateRequest":
+        # 계약상 두 값은 boolean(nullable 아님): 빼도 되지만 null 이면 400.
+        for name in ("isChecked", "alertEnabled"):
+            if name in self.model_fields_set and getattr(self, name) is None:
+                raise ValueError(f"{name} 는 true 또는 false 여야 한다")
         if self.isChecked is None and self.alertEnabled is None:
             raise ValueError("isChecked 나 alertEnabled 중 하나는 있어야 한다")
         return self
