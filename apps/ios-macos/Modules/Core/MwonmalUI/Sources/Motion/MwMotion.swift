@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 스프링 값 토큰(ADR-0012). 화면은 숫자 대신 이 이름만 쓴다.
-public struct MwSpring: Hashable, Sendable {
+public nonisolated struct MwSpring: Hashable, Sendable {
     public let response: Double
     public let dampingFraction: Double
 
@@ -30,7 +30,7 @@ public struct MwSpring: Hashable, Sendable {
 }
 
 /// 차례로 나타나는 요소의 간격(ADR-0012 `MwStagger`). 너무 길어지지 않게 상한이 있다.
-public struct MwStagger: Hashable, Sendable {
+public nonisolated struct MwStagger: Hashable, Sendable {
     public let interval: Double
     public let cap: Double
 
