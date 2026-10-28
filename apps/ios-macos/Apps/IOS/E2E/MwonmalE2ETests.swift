@@ -14,7 +14,7 @@ final class MwonmalE2ETests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-MWResetSession", "-MWDevLogin", "e2e\(Int(Date().timeIntervalSince1970))"]
+        app.launchArguments = ["-MWResetSession", "-MWResetOnboarding", "-MWDevLogin", "e2e\(Int(Date().timeIntervalSince1970))"]
     }
 
     private func shot(_ name: String) {
@@ -36,7 +36,25 @@ final class MwonmalE2ETests: XCTestCase {
         settingsConsentAndSignOut()
     }
 
+    /// O-1~O-3 온보딩(처음 켤 때 한 번). 다음 두 번 → 시작하기 → 로그인 화면.
+    private func onboarding() {
+        let next = app.buttons["onboarding.next"]
+        wait(next, 15)
+        XCTAssertTrue(app.buttons["onboarding.skip"].exists)
+        shot("00a-onboarding-1")
+        next.tap()
+        wait(app.staticTexts["메신저에서도, 회의에서도"])
+        shot("00b-onboarding-2")
+        next.tap()
+        let start = app.buttons["onboarding.start"]
+        wait(start)
+        wait(app.staticTexts["잊기 전에, 퇴근길에"])
+        shot("00c-onboarding-3")
+        start.tap()
+    }
+
     private func signInAndDecode() {
+        onboarding()
         // 1. S-01 로그인
         let apple = app.buttons["signin.apple"]
         wait(apple)

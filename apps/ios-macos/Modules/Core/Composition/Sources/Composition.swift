@@ -276,55 +276,6 @@ struct ReviewComingSoonView: View {
     }
 }
 
-/// 세션 상태에 따라 로그인 화면과 탭 루트를 고른다.
-public struct SessionRootView: View {
-    @ViewModelState private var session: AppSession
-
-    /// `.live()`(Keychain·URLSession·API 조립)는 앱 수명에 한 번만 돈다 — App 의 body 가 다시 불려도.
-    public init(session: @autoclosure @escaping () -> AppSession = .live()) {
-        _session = ViewModelState(wrappedValue: session())
-    }
-
-    public var body: some View {
-        Group {
-            switch session.state {
-            case .none:
-                ProgressView()
-            case .signedOut:
-                AuthContainer {
-                    AuthRootView(isSigningIn: session.isSigningIn, errorMessage: session.lastError.flatMap(\.userMessage)) {
-                        session.signInWithApple()
-                    }
-                }
-            case .signedIn, .unverified:
-                AppRootView(session: session)
-            }
-        }
-        .mwScaledToWidth()
-        .task { await session.start().value }
-    }
-}
-
-/// 로그인 화면은 iPhone 한 장 그림(S-01)이라 넓은 화면에서는 가운데 기기 폭(393pt) 기둥으로 보여 준다.
-private struct AuthContainer<Content: View>: View {
-    @ViewBuilder let content: Content
-    @Environment(\.mwLayout) private var layout
-
-    var body: some View {
-        if layout == .wide {
-            content
-                .environment(\.mwLayout, .compact)
-                .frame(maxWidth: MwFrame.width)
-                .clipShape(RoundedRectangle(cornerRadius: 32, style: .circular))
-                .padding(.vertical, 24)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(MwColor.brandPanel.ignoresSafeArea())
-        } else {
-            content
-        }
-    }
-}
-
 extension DomainError {
     /// 로그인 화면에 보일 문구. 서버 문구가 있으면 그것, 세션 만료면 안내, 나머지는 nil(화면 기본 문구).
     var userMessage: String? {

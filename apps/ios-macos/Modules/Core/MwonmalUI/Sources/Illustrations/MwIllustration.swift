@@ -15,4 +15,18 @@ public enum MwIllustration {
             .allowsHitTesting(false)
             .accessibilityHidden(true)
     }
+
+    /// 앱 로고(Figma 51:359, O-3 알림 아이콘의 "?" 말풍선). 시작 연출·알림 타일·앱 아이콘이 같은 그림을 쓴다.
+    public static var brandLogo: some View {
+        Image("BrandLogo", bundle: .module)
+            .resizable()
+            .accessibilityHidden(true)
+    }
+
+    /// 온보딩 O-2 칩의 "붙여넣기" 아이콘(Figma 51:239, 15.42×18.77).
+    public static var pasteIcon: some View {
+        Image("OnboardingPasteIcon", bundle: .module)
+            .resizable()
+            .accessibilityHidden(true)
+    }
 }
