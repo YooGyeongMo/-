@@ -85,7 +85,9 @@ let apps: [Target] = [
         product: .app,
         bundleId: "kr.mwonmal.mac",
         deploymentTargets: .macOS("14.0"),
-        infoPlist: .extendingDefault(with: appInfo),
+        // Tuist 기본 macOS Info.plist 는 NSMainStoryboardFile = "Main" 을 넣는다. 없는 스토리보드를 가리키면
+        // SwiftUI App 이 창을 하나도 만들지 못한다(메뉴 막대만 뜸, macOS E2E 로 발견) → 비운다.
+        infoPlist: .extendingDefault(with: appInfo.merging(["NSMainStoryboardFile": ""]) { $1 }),
         sources: ["Apps/Mac/Sources/**"],
         entitlements: .file(path: "Apps/Mac/Mwonmal.entitlements"),
         dependencies: [.target(name: "Composition")],
@@ -129,6 +131,13 @@ let unitTests: [TestableTarget] = allTargets
     .filter { $0.product == .unitTests }
     .map { TestableTarget(stringLiteral: $0.name) }
 
+/// 앱 스킴 Run(Debug) 기본 실행 인자: 로컬 서버 개발용 로그인(ADR-0020, Debug 빌드에서만 동작).
+/// 처음부터 로그인 화면이 필요하면 -MWResetSession 을 켠다.
+let devRunArguments: Arguments = .arguments(launchArguments: [
+    .launchArgument(name: "-MWDevLogin demo", isEnabled: true),
+    .launchArgument(name: "-MWResetSession", isEnabled: false),
+])
+
 let project = Project(
     name: "Mwonmal",
     organizationName: "Mwonmal",
@@ -144,13 +153,13 @@ let project = Project(
             name: "MwonmalIOS",
             buildAction: .buildAction(targets: ["MwonmalIOS"]),
             testAction: .targets(unitTests),
-            runAction: .runAction(executable: "MwonmalIOS")
+            runAction: .runAction(configuration: .debug, executable: "MwonmalIOS", arguments: devRunArguments)
         ),
         .scheme(
             name: "MwonmalMac",
             buildAction: .buildAction(targets: ["MwonmalMac"]),
             testAction: .targets(unitTests),
-            runAction: .runAction(executable: "MwonmalMac")
+            runAction: .runAction(configuration: .debug, executable: "MwonmalMac", arguments: devRunArguments)
         ),
         .scheme(
             name: "MwonmalE2E",
