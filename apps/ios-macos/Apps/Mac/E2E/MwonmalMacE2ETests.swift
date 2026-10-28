@@ -14,7 +14,11 @@ final class MwonmalMacE2ETests: XCTestCase {
     override func setUp() {
         continueAfterFailure = false
         app = XCUIApplication()
-        app.launchArguments = ["-MWResetSession", "-MWDevLogin", "mac\(Int(Date().timeIntervalSince1970))"]
+        // 저장된 창 상태(창 0개)를 복원하지 않게 한다 — 전에 창을 닫고 끝냈으면 창 없이 뜬다.
+        app.launchArguments = [
+            "-ApplePersistenceIgnoreState", "YES",
+            "-MWResetSession", "-MWDevLogin", "mac\(Int(Date().timeIntervalSince1970))",
+        ]
     }
 
     override func tearDown() {
