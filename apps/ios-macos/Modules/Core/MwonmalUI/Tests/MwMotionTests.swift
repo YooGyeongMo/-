@@ -60,7 +60,7 @@ struct OnboardingStageTests {
     @Test("낮은 화면: 높이에 맞추고 가운데·바닥") func short() {
         let size = CGSize(width: 375, height: 300)
         let scale = OnboardingStage.scale(for: size)
-        #expect(scale == 300 / 500)
+        #expect(scale == CGFloat(300) / 500)
         let origin = OnboardingStage.origin(for: size, scale: scale)
         #expect(origin.y == 0)
         #expect(abs(origin.x - (375 - 393 * scale) / 2) < 0.0001)
