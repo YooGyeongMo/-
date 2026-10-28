@@ -1,0 +1,363 @@
+{
+  "sourceLanguage": "ko",
+  "strings": {
+    "onboarding.next": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "다음"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Next"
+          }
+        }
+      }
+    },
+    "onboarding.page1.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "단어는 들리는데, 뜻은 한 겹 뒤에 숨어 있어요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "You hear the words, but the meaning hides one layer down."
+          }
+        }
+      }
+    },
+    "onboarding.page1.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "회의실에서 매일 일어나는 일"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Happens in every meeting"
+          }
+        }
+      }
+    },
+    "onboarding.page1.title1": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "회의에서 들은 그 말,"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "That phrase from the meeting,"
+          }
+        }
+      }
+    },
+    "onboarding.page1.title2": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "무슨 뜻이었을까요?"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "what did it mean?"
+          }
+        }
+      }
+    },
+    "onboarding.page2.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "앱과 웹 어디서든 같은 기능이에요. 긴 회의록은 큰 화면에서 보기 편해요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Same features in the app and on the web. Long meeting notes are easier on a big screen."
+          }
+        }
+      }
+    },
+    "onboarding.page2.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "메신저에서도, 회의에서도"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "In chats and in meetings"
+          }
+        }
+      }
+    },
+    "onboarding.page2.sources": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "붙여넣기 · 캡처 · 회의 녹음"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste · Screenshot · Recording"
+          }
+        }
+      }
+    },
+    "onboarding.page2.title1": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "받은 말을 붙여넣으면"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Paste what you received"
+          }
+        }
+      }
+    },
+    "onboarding.page2.title2": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "한 겹씩 풀어드려요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "and we unpack it layer by layer"
+          }
+        }
+      }
+    },
+    "onboarding.page3.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "어디서 해석했든 할 일은 마감 전에, 모르는 말은 퇴근길에 알려드려요."
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Wherever you decoded it, to-dos come before the deadline and new words on your way home."
+          }
+        }
+      }
+    },
+    "onboarding.page3.eyebrow": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "잊기 전에, 퇴근길에"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Before you forget, on the way home"
+          }
+        }
+      }
+    },
+    "onboarding.page3.noticeDue.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "역할 정리 문서, 30분 뒤 마감이에요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Roles doc is due in 30 minutes"
+          }
+        }
+      }
+    },
+    "onboarding.page3.noticeDue.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일 마감 · 뭔말인교"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "To-do due · Mwonmal"
+          }
+        }
+      }
+    },
+    "onboarding.page3.noticeReview.body": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "'얼라인' 기억나세요? 잊기 전에 복습해요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Remember 'align'? Review it before you forget"
+          }
+        }
+      }
+    },
+    "onboarding.page3.noticeReview.title": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "퇴근길 3분 · 뭔말인교"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 min on the way home · Mwonmal"
+          }
+        }
+      }
+    },
+    "onboarding.page3.title1": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "할 일은 챙기고,"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "We keep your to-dos"
+          }
+        }
+      }
+    },
+    "onboarding.page3.title2": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "잊기 전에 다시 알려드려요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "and remind you before you forget"
+          }
+        }
+      }
+    },
+    "onboarding.progress": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "온보딩 쪽"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Onboarding page"
+          }
+        }
+      }
+    },
+    "onboarding.skip": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "건너뛰기"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Skip"
+          }
+        }
+      }
+    },
+    "onboarding.start": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "시작하기"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Get started"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}

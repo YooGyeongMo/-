@@ -17,7 +17,7 @@ final class MwonmalMacE2ETests: XCTestCase {
         // 저장된 창 상태(창 0개)를 복원하지 않게 한다 — 전에 창을 닫고 끝냈으면 창 없이 뜬다.
         app.launchArguments = [
             "-ApplePersistenceIgnoreState", "YES",
-            "-MWResetSession", "-MWDevLogin", "mac\(Int(Date().timeIntervalSince1970))",
+            "-MWResetSession", "-MWResetOnboarding", "-MWDevLogin", "mac\(Int(Date().timeIntervalSince1970))",
         ]
     }
 
@@ -40,10 +40,25 @@ final class MwonmalMacE2ETests: XCTestCase {
         XCTAssertTrue(element.waitForExistence(timeout: timeout), "안 보임: \(element)", file: file, line: line)
     }
 
+    /// 0. 온보딩(넓은 화면: 왼쪽 그림 패널 + 오른쪽 글·버튼 열). 다음 두 번 → 시작하기.
+    private func onboarding() {
+        let next = element("onboarding.next")
+        wait(next, 15)
+        shot("00a-onboarding-1")
+        next.click()
+        wait(app.staticTexts["메신저에서도, 회의에서도"])
+        next.click()
+        let start = element("onboarding.start")
+        wait(start)
+        shot("00c-onboarding-3")
+        start.click()
+    }
+
     func testWideDecodeFlowEndToEnd() {
         app.launch()
+        onboarding()
 
-        // 1. 로그인(넓은 화면에서는 가운데 기기 폭 기둥)
+        // 1. 로그인(넓은 화면: 왼쪽 히어로 패널 + 오른쪽 로고·버튼 열)
         let apple = element("signin.apple")
         wait(apple, 15)
         shot("01-login")

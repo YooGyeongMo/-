@@ -9,8 +9,8 @@ import ProjectDescriptionHelpers
 // Tuist는 순환만 막는다 → 방향은 헬퍼의 precondition + CI scripts/check-module-deps.py.
 // REQ-02 / ADR-0005: 최소 iOS 17.0 · macOS 14.0. 18·26 전용 API 게이트는 Platform · MwonmalUI/Compat · Composition 세 곳만.
 
-/// v1.0 기능 모듈. v1.1: Onboarding, Review(example), Quiz / v1.2: Project, Meeting(example).
-let featureNames = ["Auth", "Translate", "Home", "Settings"]
+/// 기능 모듈. Onboarding은 v1.1 목록에서 앞당겼다(ADR-0024). v1.1: Review(example), Quiz / v1.2: Project, Meeting(example).
+let featureNames = ["Auth", "Onboarding", "Translate", "Home", "Settings"]
 let features: [Target] = featureNames.flatMap { featureModule($0, example: $0 == "Translate") }
 
 let coreTargets: [Target] =
@@ -73,8 +73,12 @@ let apps: [Target] = [
         product: .app,
         bundleId: "kr.mwonmal.app",
         deploymentTargets: .iOS("17.0"),
-        infoPlist: .extendingDefault(with: appInfo.merging(["UILaunchScreen": [:]]) { $1 }),
+        // 실행 화면 = 종이색 + 가운데 로고 96pt. SwiftUI 시작 연출(MwLaunchSplash)의 첫 프레임과 같다(ADR-0024).
+        infoPlist: .extendingDefault(with: appInfo.merging([
+            "UILaunchScreen": ["UIColorName": "LaunchBackground", "UIImageName": "LaunchLogo", "UIImageRespectsSafeAreaInsets": false],
+        ]) { $1 }),
         sources: ["Apps/IOS/Sources/**"],
+        resources: ["Apps/IOS/Resources/**"],
         entitlements: .file(path: "Apps/IOS/Mwonmal.entitlements"),
         dependencies: [.target(name: "Composition")],
         settings: apiSettings
@@ -89,6 +93,7 @@ let apps: [Target] = [
         // SwiftUI App 이 창을 하나도 만들지 못한다(메뉴 막대만 뜸, macOS E2E 로 발견) → 비운다.
         infoPlist: .extendingDefault(with: appInfo.merging(["NSMainStoryboardFile": ""]) { $1 }),
         sources: ["Apps/Mac/Sources/**"],
+        resources: ["Apps/Mac/Resources/**"],
         entitlements: .file(path: "Apps/Mac/Mwonmal.entitlements"),
         dependencies: [.target(name: "Composition")],
         settings: apiSettings
@@ -136,6 +141,7 @@ let unitTests: [TestableTarget] = allTargets
 let devRunArguments: Arguments = .arguments(launchArguments: [
     .launchArgument(name: "-MWDevLogin demo", isEnabled: true),
     .launchArgument(name: "-MWResetSession", isEnabled: false),
+    .launchArgument(name: "-MWResetOnboarding", isEnabled: false),
 ])
 
 let project = Project(
