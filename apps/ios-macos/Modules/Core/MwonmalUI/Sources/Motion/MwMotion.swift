@@ -1,7 +1,7 @@
 import SwiftUI
 
 /// 스프링 값 토큰(ADR-0012). 화면은 숫자 대신 이 이름만 쓴다.
-public nonisolated struct MwSpring: Hashable, Sendable {
+public nonisolated struct MwSpring: Hashable, Codable, Sendable {
     public let response: Double
     public let dampingFraction: Double
 
@@ -52,27 +52,22 @@ public nonisolated struct MwStagger: Hashable, Sendable {
 /// 애니메이션 프리셋(ADR-0012·0024). 화면은 곡선 리터럴 대신 이것만 쓴다. 동작 줄이기 설정이면
 /// 스프링·지연 없이 짧은 페이드(0.15초)로 바뀌고, 계속 도는 움직임은 멈춘다.
 public enum MwMotion {
-    /// 동작 줄이기에서 쓰는 대신 곡선.
-    static let reduced = Animation.easeInOut(duration: 0.15)
-
-    /// 아래 안내(토스트)가 나타나고 사라질 때.
-    public static func toast(reduceMotion: Bool) -> Animation? {
-        reduceMotion ? nil : .snappy(duration: 0.28)
-    }
+    /// 동작 줄이기에서 쓰는 대신 곡선(`MwTiming.reducedDuration`).
+    static let reduced = Animation.easeInOut(duration: MwTiming.reducedDuration)
 
     /// 스프링 토큰 → Animation. 지연은 차례 연출에만 쓴다.
     public static func spring(_ spring: MwSpring, delay: Double = 0, reduceMotion: Bool) -> Animation {
-        reduceMotion ? reduced : spring.animation.delay(delay)
+        MwTiming(spring: spring, delay: delay).animation(reduceMotion: reduceMotion) ?? reduced
+    }
+
+    /// 아래 오버레이(토스트·안내 띠)가 나타나고 사라질 때(`sheetPresent` 프리셋). `mwSheetTransition()`과 짝.
+    public static func sheet(_ theme: MwMotionTheme, reduceMotion: Bool) -> Animation? {
+        theme.sheetPresent.timing.animation(reduceMotion: reduceMotion || theme.isReduced)
     }
 
     /// 화면(페이지) 전환. 들어오는 장면은 멀리서 다가오고, 나가는 장면은 카메라를 지나쳐 흐려진다(ADR-0024 다이브).
     public static func page(reduceMotion: Bool) -> Animation {
         spring(.soft, reduceMotion: reduceMotion)
-    }
-
-    /// 계속 떠다니는 움직임(칩 흔들림·자전거). 반 주기마다 방향이 바뀐다.
-    static func float(period: Double) -> Animation {
-        .easeInOut(duration: period / 2).repeatForever(autoreverses: true)
     }
 
     /// 버튼 둘레 물결 한 번이 퍼지는 시간.

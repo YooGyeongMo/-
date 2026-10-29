@@ -45,6 +45,7 @@ struct ActionRow: View {
     let item: UpcomingAction
     let onToggle: () -> Void
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 14 * scale) {
@@ -83,6 +84,7 @@ struct ActionRow: View {
         }
         .padding(.horizontal, 18 * scale)
         .frame(minHeight: 56 * scale)
+        .animation(MwMotion.spring(.snappy, reduceMotion: reduceMotion), value: item.action.isChecked)
     }
 }
 
@@ -105,5 +107,19 @@ struct DueBadge {
         } else {
             return nil
         }
+    }
+}
+
+/// 퇴근길 복습 알림 시각 문구("오후 6:00"). 시각만 보이므로 고정 날짜로 만든다.
+extension HomeRootView {
+    static func reminderText(hour: Int) -> String {
+        var comps = DateComponents()
+        comps.year = 2026
+        comps.month = 1
+        comps.day = 1
+        comps.hour = hour
+        comps.minute = 0
+        let date = Calendar(identifier: .gregorian).date(from: comps) ?? Date()
+        return date.formatted(.dateTime.hour().minute().locale(Locale(identifier: "ko_KR")))
     }
 }

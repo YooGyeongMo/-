@@ -164,6 +164,8 @@ public struct ComposeSheet: View {
                     .accessibilityLabel(Text("translate.compose.placeholder", bundle: .module))
                     .accessibilityIdentifier("compose.editor")
             }
+            // 해석을 기다리는 동안 붙여 넣은 글이 천천히 숨 쉰다(decodingPulse, ADR-0025). 동작 줄이기면 버튼의 진행 표시만.
+            .mwDecodingPulse(isActive: model.state == .translating)
             .padding(.top, 10 * scale)
             // swiftlint:disable:next no_fixed_height - 1pt 구분선·빛 줄(글자 없음)
             Rectangle().fill(MwColor.separator).frame(height: 1).padding(.top, 12 * scale)

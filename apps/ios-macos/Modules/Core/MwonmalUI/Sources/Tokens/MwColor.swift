@@ -55,6 +55,9 @@ public enum MwColor {
     public static let eyebrowBlue = token("eyebrow.blue")
     public static let eyebrowTeal = token("eyebrow.teal")
     public static let eyebrowOrange = token("eyebrow.orange")
+    /// 온보딩 O-2·O-3 아래 글 영역 바탕(Figma 51:178 #E2F3F2 · 51:301 #FDEBDF). O-1은 canvas. 다크는 canvas와 같다.
+    public static let onboardingTeal = token("bg.onboardingTeal")
+    public static let onboardingOrange = token("bg.onboardingOrange")
 
     /// 테스트·카탈로그가 전부를 훑을 수 있게.
     public static let allNames: [String] = [
@@ -67,6 +70,7 @@ public enum MwColor {
         "text.strong", "text.disabled", "chip.fill", "control.checkbox", "badge.fill", "accent.shadow",
         "accent.softFill", "glass.fill", "glass.fillThin", "glass.border", "tab.selected", "jargon.highlight",
         "sheet.grabber", "onHero.primary", "onHero.strong", "eyebrow.blue", "eyebrow.teal", "eyebrow.orange",
+        "bg.onboardingTeal", "bg.onboardingOrange",
     ]
 
     static func token(_ name: String) -> Color {

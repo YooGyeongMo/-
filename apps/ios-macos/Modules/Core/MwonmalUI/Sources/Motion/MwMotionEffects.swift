@@ -67,7 +67,7 @@ struct MwDive: ViewModifier {
 struct MwFocusIn: ViewModifier {
     let isIn: Bool
     let delay: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         let still = isIn || reduceMotion
@@ -82,7 +82,7 @@ struct MwFocusIn: ViewModifier {
 struct MwRise: ViewModifier {
     let isIn: Bool
     let delay: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
     @Environment(\.mwScale) private var scale
 
     func body(content: Content) -> some View {
@@ -99,7 +99,7 @@ struct MwSlideIn: ViewModifier {
     let isIn: Bool
     let from: CGSize
     let delay: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         let still = isIn || reduceMotion
@@ -115,7 +115,7 @@ struct MwPop: ViewModifier {
     let delay: Double
     let tilt: Double
     let anchor: UnitPoint
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         let still = isIn || reduceMotion
@@ -133,7 +133,7 @@ struct MwFloat: ViewModifier {
     let amplitude: CGFloat
     let period: Double
     let phase: Double
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
     @State private var start = Date()
 
     /// 0(제자리) → -amplitude(위) → 0. 시작과 끝에서 속도가 0이라 튀지 않는다.
@@ -144,7 +144,8 @@ struct MwFloat: ViewModifier {
 
     func body(content: Content) -> some View {
         let running = isActive && !reduceMotion
-        TimelineView(.animation(paused: !running)) { context in
+        // 초당 30번: 느린 오르내림(최대 약 7pt/초)이라 한 번에 0.25pt 이하로 움직여 차이가 보이지 않는다(ADR-0025).
+        TimelineView(.animation(minimumInterval: MwMotion.ambientFrameInterval, paused: !running)) { context in
             content.offset(y: running ? Self.offset(
                 elapsed: context.date.timeIntervalSince(start) - phase,
                 amplitude: amplitude,
@@ -163,7 +164,7 @@ struct MwPulseRing: ViewModifier {
     let isActive: Bool
     let cornerRadius: CGFloat
     let color: Color
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
     @Environment(\.mwScale) private var scale
 
     func body(content: Content) -> some View {

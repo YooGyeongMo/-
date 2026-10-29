@@ -14,6 +14,8 @@ public struct ResultSheet: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
     @Environment(\.mwLayout) private var layout
+    /// 결과가 처음 보일 때 카드가 차례로 떠오른다(ADR-0025). 한 번만.
+    @State private var revealed = false
 
     public init(
         translationId: Int64,
@@ -77,28 +79,29 @@ public struct ResultSheet: View {
                 header(model.translation.value)
                 switch model.translation {
                 case .idle, .loading:
-                    ProgressView().frame(maxWidth: .infinity, minHeight: 240)
+                    decoding.frame(maxWidth: MwLayout.readableWidth).padding(.top, 16)
                 case let .failed(code):
                     failure(code).padding(.top, 24)
                 case let .loaded(item):
                     HStack(alignment: .top, spacing: 24) {
                         VStack(alignment: .leading, spacing: 12) {
-                            sourceCard(item)
+                            sourceCard(item).mwRise(revealed, index: 0)
                             if let nuance = item.nuance {
-                                nuanceCard(nuance, intent: item.intent)
+                                nuanceCard(nuance, intent: item.intent).mwRise(revealed, index: 1)
                             }
                         }
                         .frame(maxWidth: MwLayout.readableWidth)
                         VStack(alignment: .leading, spacing: 0) {
-                            actionsBlock(item)
+                            actionsBlock(item).mwRise(revealed, index: 2)
                             termsBlock(item)
                             if !item.terms.isEmpty {
-                                addAllButton.padding(.top, 16)
+                                addAllButton.padding(.top, 16).mwRise(revealed, index: 4)
                             }
                         }
                         .frame(width: MwLayout.asideWidth + 40)
                     }
                     .padding(.top, 16)
+                    .onAppear { revealed = true }
                 }
             }
             .padding(32)
@@ -111,20 +114,21 @@ public struct ResultSheet: View {
         switch model.translation {
         case .idle, .loading:
             header(nil)
-            ProgressView().frame(maxWidth: .infinity, minHeight: 240 * scale)
+            decoding.padding(.top, 16 * scale)
         case let .failed(code):
             header(nil)
             failure(code).padding(.top, 24 * scale)
         case let .loaded(item):
             header(item)
             VStack(alignment: .leading, spacing: 0) {
-                sourceCard(item).padding(.top, 16 * scale)
+                sourceCard(item).padding(.top, 16 * scale).mwRise(revealed, index: 0)
                 if let nuance = item.nuance {
-                    nuanceCard(nuance, intent: item.intent).padding(.top, 12 * scale)
+                    nuanceCard(nuance, intent: item.intent).padding(.top, 12 * scale).mwRise(revealed, index: 1)
                 }
-                actionsBlock(item).padding(.top, 12 * scale)
+                actionsBlock(item).padding(.top, 12 * scale).mwRise(revealed, index: 2)
                 termsBlock(item)
             }
+            .onAppear { revealed = true }
         }
     }
 }
@@ -132,6 +136,12 @@ public struct ResultSheet: View {
 // MARK: - 조각(타입 본문 길이 제한 때문에 확장으로 나눔, 같은 파일이라 private 접근 가능)
 
 extension ResultSheet {
+    /// 결과를 기다리는 자리: 카드 모양 빈 칸이 숨 쉰다(동작 줄이기면 진행 표시).
+    private var decoding: some View {
+        MwDecodingPlaceholder(Text("translate.result.decoding", bundle: .module))
+            .accessibilityIdentifier("result.decoding")
+    }
+
     private func failure(_ code: String) -> some View {
         Text(
             code == "NOT_FOUND" ? "translate.result.notFound" : code == "OFFLINE" ? "translate.error.offline" :
@@ -161,10 +171,11 @@ extension ResultSheet {
 
     @ViewBuilder private func termsBlock(_ item: Domain.Translation) -> some View {
         if !item.terms.isEmpty {
-            MwSectionHeader(Text("translate.result.terms", bundle: .module)).padding(.top, 12 * scale)
+            MwSectionHeader(Text("translate.result.terms", bundle: .module)).padding(.top, 12 * scale).mwRise(revealed, index: 3)
             MwFlowLayout(spacing: 6 * scale) {
-                ForEach(Array(item.terms.enumerated()), id: \.offset) { _, term in
+                ForEach(Array(item.terms.enumerated()), id: \.offset) { index, term in
                     TermChip(term: term) { open(term) }
+                        .mwPop(revealed, index: index, tilt: index.isMultiple(of: 2) ? -5 : 5, baseDelay: MwStagger.text.delay(for: 3))
                 }
             }
         }

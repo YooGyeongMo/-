@@ -26,7 +26,7 @@ public struct ViewModelState<Model: AnyObject & Observable>: DynamicProperty {
     }
 
     public var wrappedValue: Model {
-        if let model = box.model {
+        if let model = box.model as? Model {
             return model
         }
         let model = make()
@@ -37,8 +37,10 @@ public struct ViewModelState<Model: AnyObject & Observable>: DynamicProperty {
     public var projectedValue: Bindable<Model> {
         Bindable(wrappedValue)
     }
+}
 
-    private final class Box {
-        var model: Model?
-    }
+/// 제네릭이 아닌 상자. `ViewModelState<Model>` 안에 제네릭 클래스로 두면 Swift 6.3 최적화(-O, Release)에서
+/// 컴파일러가 죽는다(EarlyPerfInliner, 제네릭 중첩 클래스의 deinit). 꺼낼 때 한 번 형 변환한다.
+private final class Box {
+    var model: AnyObject?
 }

@@ -20,6 +20,15 @@ struct OnboardingPage: Equatable {
             case .orange: MwColor.eyebrowOrange
             }
         }
+
+        /// 아래 글 영역 바탕(Figma 쪽마다 다르다).
+        var panel: Color {
+            switch self {
+            case .blue: MwColor.canvas
+            case .teal: MwColor.onboardingTeal
+            case .orange: MwColor.onboardingOrange
+            }
+        }
     }
 
     let index: Int

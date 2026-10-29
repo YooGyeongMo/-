@@ -16,7 +16,7 @@ public struct OnboardingView: View {
     @State private var forward = true
     @Environment(\.mwLayout) private var layout
     @Environment(\.mwScale) private var scale
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     public init(onFinish: @escaping () -> Void) {
         self.onFinish = onFinish
@@ -34,7 +34,8 @@ public struct OnboardingView: View {
                 OnboardingCompactLayout(page: page, index: index, forward: forward, controls: controls)
             }
         }
-        .background(MwColor.canvas.ignoresSafeArea())
+        // 쪽마다 바탕색이 다르다(O-1 종이 · O-2 옅은 청록 · O-3 옅은 살구). 쪽 넘김과 같은 시간표로 바뀐다.
+        .background(page.accent.panel.ignoresSafeArea())
         .overlay(alignment: .topLeading) {
             MwIllustration.paperGrain
                 .frame(width: OnboardingSpec.paperGrain * scale, height: OnboardingSpec.paperGrain * scale)

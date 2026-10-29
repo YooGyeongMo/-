@@ -218,11 +218,13 @@ public struct MwSecondaryButtonStyle: ButtonStyle {
 public struct MwCheckbox: View {
     let isOn: Bool
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     public init(isOn: Bool) {
         self.isOn = isOn
     }
 
+    /// 체크하면 표시가 작게 튀어나오고 칸이 한 번 살짝 눌린다(ADR-0025). 끝 상태는 Figma 그대로.
     public var body: some View {
         let shape = RoundedRectangle(cornerRadius: 9 * scale, style: .circular)
         ZStack {
@@ -230,9 +232,11 @@ public struct MwCheckbox: View {
             shape.strokeBorder(isOn ? MwColor.accentFill : MwColor.checkboxBorder, lineWidth: 2 * scale)
             if isOn {
                 MwIconView(.check, color: MwColor.accentOnFill)
+                    .transition(reduceMotion ? .opacity : .scale(scale: 0.3).combined(with: .opacity))
             }
         }
         .frame(width: 26 * scale, height: 26 * scale)
+        .animation(MwMotion.spring(.pop, reduceMotion: reduceMotion), value: isOn)
     }
 }
 

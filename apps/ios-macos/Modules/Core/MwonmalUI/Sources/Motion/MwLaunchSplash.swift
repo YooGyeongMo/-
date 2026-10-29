@@ -11,7 +11,7 @@ import SwiftUI
 public struct MwLaunchSplash<Content: View>: View {
     @ViewBuilder let content: Content
     @State private var phase: Phase = .cover
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     public init(@ViewBuilder content: () -> Content) {
         self.content = content()

@@ -4,6 +4,13 @@ import SwiftUI
 @main
 struct CatalogApp: App {
     var body: some Scene {
-        WindowGroup { Text("MwonmalUI Catalog — \(MwonmalUIModule.name)").padding() }
+        WindowGroup {
+            NavigationStack {
+                List {
+                    NavigationLink("MotionLab") { MotionLab() }
+                }
+                .navigationTitle("MwonmalUI Catalog")
+            }
+        }
     }
 }

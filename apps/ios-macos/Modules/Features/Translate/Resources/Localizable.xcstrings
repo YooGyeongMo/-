@@ -1004,6 +1004,23 @@
         }
       }
     },
+    "translate.result.decoding": {
+      "extractionState": "manual",
+      "localizations": {
+        "ko": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "해석하고 있어요"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Decoding…"
+          }
+        }
+      }
+    },
     "translate.result.deleteFailed": {
       "extractionState": "manual",
       "localizations": {
