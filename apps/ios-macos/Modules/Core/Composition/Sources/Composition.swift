@@ -26,7 +26,8 @@ struct AppRootView: View {
     @State private var prefetched: Domain.Translation?
     @Environment(\.mwScale) private var scale
     @Environment(\.mwLayout) private var layout
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
+    @Environment(\.mwMotion) private var motionTheme
     @State private var bottomInset: CGFloat = 0
 
     private var translate: TranslateDependencies {
@@ -162,7 +163,7 @@ struct AppRootView: View {
 
     private func toastView(_ key: LocalizedStringKey) -> some View {
         MwToast(Text(key, bundle: .module))
-            .transition(.move(edge: .bottom).combined(with: .opacity))
+            .mwSheetTransition()
             .accessibilityIdentifier("toast")
     }
 
@@ -222,7 +223,7 @@ struct AppRootView: View {
         .presentationDragIndicator(.hidden)
         .overlay(alignment: .bottom) {
             if let toast, !(layout == .wide && sheet.isInlineOnWide) {
-                MwToast(Text(toast, bundle: .module)).padding(.bottom, 24 * scale).allowsHitTesting(false)
+                MwToast(Text(toast, bundle: .module)).padding(.bottom, 24 * scale).allowsHitTesting(false).mwSheetTransition()
             }
         }
     }
@@ -244,11 +245,11 @@ struct AppRootView: View {
     /// Composition 카탈로그에도 둔다(여기서 그리므로).
     private func show(_ key: LocalizedStringKey) {
         toastTask?.cancel()
-        withAnimation(MwMotion.toast(reduceMotion: reduceMotion)) { toast = key }
+        withAnimation(MwMotion.sheet(motionTheme, reduceMotion: reduceMotion)) { toast = key }
         toastTask = Task {
             try? await Task.sleep(for: .seconds(2.5))
             guard !Task.isCancelled else { return }
-            withAnimation(MwMotion.toast(reduceMotion: reduceMotion)) { toast = nil }
+            withAnimation(MwMotion.sheet(motionTheme, reduceMotion: reduceMotion)) { toast = nil }
         }
     }
 }

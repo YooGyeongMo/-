@@ -25,6 +25,8 @@
 ## 2. 🚨 지금 막혀 있는 것 / 사용자 결정
 
 - **사용자 작업 D — Apple 로그인 키 (실로그인 전 필수)**: Apple Developer → Keys에서 "Sign in with Apple" 키(.p8) 생성, App ID `kr.mwonmal.app`에 Sign in with Apple 켜기. Team ID·Key ID·.p8은 **커밋하지 말고** `services/api/.env`에(키 이름은 `.env.example`). 없으면 서버는 로그인을 401로 거절한다. #9(S-01)의 "로컬 서버 실로그인"이 이것만 기다린다.
+- **확인 필요(2026-10-29 발견)**: 이 Mac의 Xcode 서명 팀(9S8…)은 **개인(무료) 팀**이라 "Sign In with Apple" 권한이 든 프로필을 못 만든다(xcodebuild 오류). 작업 D·TestFlight 전에 유료 Apple Developer Program 팀이 있어야 한다. 이미 가입했다면 Xcode → Settings → Accounts에 그 팀을 추가.
+- **사용자 작업 E — 사람이 있어야 하는 검증(ADR-0025)**: ① iPhone 17 Pro 잠금 해제·연결 → 실기기 끊김·실행 시간 측정(`MwonmalPerfTests`). 개인 팀 측정 빌드는 처음 한 번 기기 설정 → 일반 → VPN 및 기기 관리에서 개발자 신뢰 필요. ② macOS E2E 실행 때 뜨는 자동화 허용(암호·Touch ID) 승인.
 - **PO 결정 2건 (Day 12 전까지)**: ① 결과 카드에 확신도 숫자(예: 88%) 노출? ② v1.0 다크 모드 노출? (값은 이미 4벌 있음, ADR-0017 결정 5)
 - **PCC 전제**: App Store Small Business Program 가입 여부(#103, v1.2)
 - **정리**: Docker Desktop이 멈춰 있었다. 재시작 후 `docker rm -f mw-mysql-redteam; docker rmi caddy:2`(레드팀 잔여물).
@@ -89,6 +91,7 @@ claude --resume 3709399e-b05f-475b-94d3-f593771c009a   # 이 대화 이어가기
 - **버그 3개**: iOS 17에서 아이콘 유리 버튼(✕·⚙︎)이 접근성 트리에서 빠짐(SE E2E로 발견, 수정) / 할 일 PATCH에 null 허용(계약 검사, 400으로) / **Mac 앱이 창을 안 만듦**(Tuist 기본 Info.plist `NSMainStoryboardFile=Main`, 비워서 수정).
 - 앱 스킴 Run 기본 인자 `-MWDevLogin demo`(Debug만). `-MWResetSession`은 꺼 둠.
 - **시작 연출·온보딩·움직임(ADR-0024)**: 레퍼런스 영상 3편 → 앱 켤 때 로고가 둥근 타일로 접히는 연출, 온보딩 O-1~O-3(Figma 그대로, 그림 레이어별 움직임·다이브 전환·반딧불), 로그인 입장 연출, Mac 로그인·온보딩 두 칸 배치, 앱 아이콘(iOS·Mac). 온보딩은 v1.1 목록에서 앞당김. 다시 보기: 스킴 인자 `-MWResetOnboarding` 켜기.
+- **움직임 프리셋·메인 화면·성능(ADR-0025)**: #41 마무리(MwTiming·프리셋 3개·`mwMotion`·MotionLab), 홈·붙여넣기·결과·체크·토스트에 움직임, 온보딩 쪽별 바탕색 Figma 맞춤, 성능 테스트(`MwonmalPerfTests`, `TEST_RUNNER_MW_PERF=1`). **Release 빌드에서 컴파일러가 죽던 문제 수정 + CI에 Release 빌드 추가.** 실기기 끊김 측정·macOS E2E는 사람이 있어야 함(아래 §2).
 - **macOS E2E(`MwonmalMacE2E`) 미통과 상태**: 실제 마우스·키보드를 써서 사용 중인 Mac에서는 앱이 앞으로 못 나온다 → 아무도 안 쓰는 시간에 돌려야 함.
 
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)

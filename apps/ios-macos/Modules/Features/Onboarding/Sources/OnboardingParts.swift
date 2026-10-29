@@ -5,7 +5,7 @@ import SwiftUI
 struct OnboardingScene: View {
     let page: OnboardingPage
     let forward: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     var body: some View {
         ZStack {
@@ -77,7 +77,7 @@ struct OnboardingControls: View {
     let onSkip: () -> Void
 
     @Environment(\.mwScale) private var scale
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     var body: some View {
         VStack(spacing: 0) {
@@ -118,7 +118,7 @@ struct OnboardingControls: View {
 struct OnboardingButtonStyle: ButtonStyle {
     let isPrimary: Bool
     @Environment(\.mwScale) private var scale
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     func makeBody(configuration: Configuration) -> some View {
         let shape = RoundedRectangle(cornerRadius: OnboardingSpec.buttonRadius * scale, style: .circular)

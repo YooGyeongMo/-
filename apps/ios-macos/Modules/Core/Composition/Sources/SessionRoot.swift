@@ -9,7 +9,7 @@ public struct SessionRootView: View {
     @ViewModelState private var session: AppSession
     /// 온보딩(O-1~O-3)을 끝까지 보거나 건너뛰었는지. 처음 켤 때 한 번만 보인다.
     @AppStorage(OnboardingGate.seenKey) private var onboardingSeen = false
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     /// `.live()`(Keychain·URLSession·API 조립)는 앱 수명에 한 번만 돈다 — App 의 body 가 다시 불려도.
     public init(session: @autoclosure @escaping () -> AppSession = .live()) {

@@ -92,6 +92,8 @@ public struct HomeRootView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.mwScale) private var scale
     @Environment(\.mwLayout) private var layout
+    /// 처음 보일 때 위에서부터 차례로 떠오른다(ADR-0025). 탭을 오갈 때는 다시 움직이지 않는다.
+    @State private var revealed = false
 
     public init(
         model: @autoclosure @escaping () -> HomeViewModel,
@@ -114,6 +116,7 @@ public struct HomeRootView: View {
                 compactBody
             }
         }
+        .onAppear { revealed = true }
         .task(id: refreshKey) { await model.load() }
         .refreshable { await model.load() }
         .onChange(of: model.notice) { _, notice in
@@ -197,10 +200,12 @@ public struct HomeRootView: View {
             Text(verbatim: Date().formatted(.dateTime.month(.wide).day().weekday(.wide).locale(Locale(identifier: "ko_KR"))))
                 .mwFont(.bold, 14, lineHeight: 20, tracking: -0.07)
                 .foregroundStyle(MwColor.onHeroStrong)
+                .mwRise(revealed, index: 0)
             Text("home.today", bundle: .module)
                 .mwFont(.bold, 34, lineHeight: 44, tracking: -0.68)
                 .foregroundStyle(MwColor.onHeroPrimary)
                 .accessibilityAddTraits(.isHeader)
+                .mwRise(revealed, index: 1)
         }
         .padding(.horizontal, 20 * scale)
         .padding(.top, 4 * scale)
@@ -244,17 +249,6 @@ public struct HomeRootView: View {
         .background(MwGlassBackground(cornerRadius: 26))
         .mwGlassShadow(scale)
         .padding(.horizontal, 20 * scale)
-    }
-
-    static func reminderText(hour: Int) -> String {
-        var comps = DateComponents()
-        comps.year = 2026
-        comps.month = 1
-        comps.day = 1
-        comps.hour = hour
-        comps.minute = 0
-        let date = Calendar(identifier: .gregorian).date(from: comps) ?? Date()
-        return date.formatted(.dateTime.hour().minute().locale(Locale(identifier: "ko_KR")))
     }
 
     /// 다가오는 할 일(Figma 51:1353).
@@ -361,11 +355,11 @@ extension HomeRootView {
             ZStack(alignment: .top) {
                 MwHomeHero()
                 VStack(alignment: .leading, spacing: 0) {
-                    topBar.frame(minHeight: 52 * scale).padding(.top, 54 * scale)
+                    topBar.frame(minHeight: 52 * scale).padding(.top, 54 * scale).mwFocusIn(revealed)
                     header
                     // 히어로 아래 카드: Figma 51:1328 pt 78(186 + 78 = 264)
-                    reviewCard.padding(.top, (264 - 186) * scale)
-                    actionsSection.padding(.top, 24 * scale)
+                    reviewCard.padding(.top, (264 - 186) * scale).mwRise(revealed, index: 2)
+                    actionsSection.padding(.top, 24 * scale).mwRise(revealed, index: 3)
                 }
             }
             .padding(.bottom, MwTabBar<AppTab>.reservedHeight * scale)
@@ -382,12 +376,12 @@ extension HomeRootView {
             HStack(alignment: .top, spacing: 24) {
                 VStack(alignment: .leading, spacing: 0) {
                     header
-                    actionsSection.padding(.top, 24)
+                    actionsSection.padding(.top, 24).mwRise(revealed, index: 3)
                 }
                 .frame(maxWidth: MwLayout.readableWidth)
                 VStack(spacing: 16) {
-                    levelCard
-                    reviewCard
+                    levelCard.mwFocusIn(revealed)
+                    reviewCard.mwRise(revealed, index: 2)
                 }
                 .frame(width: MwLayout.asideWidth)
             }

@@ -8,6 +8,7 @@ struct ActionLine: View {
     let action: ActionItem
     let onToggle: () -> Void
     @Environment(\.mwScale) private var scale
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     var body: some View {
         HStack(spacing: 14 * scale) {
@@ -40,6 +41,7 @@ struct ActionLine: View {
         }
         .padding(.horizontal, 18 * scale)
         .frame(minHeight: 56 * scale)
+        .animation(MwMotion.spring(.snappy, reduceMotion: reduceMotion), value: action.isChecked)
     }
 }
 

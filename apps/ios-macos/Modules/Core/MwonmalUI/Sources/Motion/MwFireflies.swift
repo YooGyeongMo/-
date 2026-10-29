@@ -8,7 +8,7 @@ public struct MwFireflies: View {
     let count: Int
     let color: Color
     let isActive: Bool
-    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.mwReduceMotion) private var reduceMotion
 
     public static let maxCount = 12
 
