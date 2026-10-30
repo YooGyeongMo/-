@@ -4,13 +4,13 @@
 > 대화 기록은 길어지면 자동 요약되어 세부가 날아간다. 그래서 중요한 것은 전부 여기와 `docs/` 아래, 그리고 GitHub 이슈에 있다.
 > 세션이 끝날 때마다 이 파일을 갱신한다(`/mw-save`). 새 세션은 `/mw` 로 이 파일부터 읽는다.
 
-**마지막 갱신**: 2026-10-29 · **main**: #117~#120 머지됨(DB 단계화·성능, 문맥 모델, macOS 넓은 레이아웃) · **CI**: 초록
+**마지막 갱신**: 2026-10-31 · **main**: `819c830`(#124 움직임 프리셋·메인 화면 움직임·Release 빌드 수정까지 머지) · **CI**: 초록(Release 빌드 단계 포함) · 열린 PR 0
 
 ---
 
 ## 1. 지금 단계 — 한 문장
 
-**v1.0 해석(11/20) Day 1~15 분량 완료(로컬 E2E 통과), 계획보다 약 2주 앞섬.** 남은 v1.0: 실서버(OCI) 배포 Day 16~17, TestFlight Day 18, 실기기 QA Day 19. Apple 키(.p8)가 있어야 실로그인.
+**v1.0 해석(11/20) Day 1~15 분량 + 시작 연출·온보딩·메인 화면 움직임 완료(로컬 E2E 통과), 계획보다 약 2주 앞섬.** 남은 v1.0: 실서버(OCI) 배포 Day 16~17, TestFlight Day 18, 실기기 QA Day 19. Apple 키(.p8)가 있어야 실로그인.
 
 | 릴리스 | 마감 | 마일스톤 |
 |---|---|---|
@@ -27,6 +27,8 @@
 - **사용자 작업 D — Apple 로그인 키 (실로그인 전 필수)**: Apple Developer → Keys에서 "Sign in with Apple" 키(.p8) 생성, App ID `kr.mwonmal.app`에 Sign in with Apple 켜기. Team ID·Key ID·.p8은 **커밋하지 말고** `services/api/.env`에(키 이름은 `.env.example`). 없으면 서버는 로그인을 401로 거절한다. #9(S-01)의 "로컬 서버 실로그인"이 이것만 기다린다.
 - **확인 필요(2026-10-29 발견)**: 이 Mac의 Xcode 서명 팀(9S8…)은 **개인(무료) 팀**이라 "Sign In with Apple" 권한이 든 프로필을 못 만든다(xcodebuild 오류). 작업 D·TestFlight 전에 유료 Apple Developer Program 팀이 있어야 한다. 이미 가입했다면 Xcode → Settings → Accounts에 그 팀을 추가.
 - **사용자 작업 E — 사람이 있어야 하는 검증(ADR-0025)**: ① iPhone 17 Pro 잠금 해제·연결 → 실기기 끊김·실행 시간 측정(`MwonmalPerfTests`). 개인 팀 측정 빌드는 처음 한 번 기기 설정 → 일반 → VPN 및 기기 관리에서 개발자 신뢰 필요. ② macOS E2E 실행 때 뜨는 자동화 허용(암호·Touch ID) 승인.
+  - 2026-10-31 확인: iPhone 17 Pro는 연결(available)돼 있지만 **측정용 앱이 기기에 없다** → 다시 build-for-testing·설치부터. 측정 서명 설정(`perf.xcconfig`: 개인 팀, 번들 ID `.dperf`, 권한 뺀 entitlements, `MW_API_BASE_URL`=Mac 사내망 주소:8081)은 **저장소에 넣지 않으므로** 새 세션에서 scratchpad에 다시 만든다(ADR-0025 측정 결과 절 참고).
+  - 사용자에게 물을 것: "iPhone 측정 지금 할까요? 화면 켜고 잠금 해제한 채 두시고, 신뢰 화면이 뜨면 승인해 주세요."
 - **PO 결정 2건 (Day 12 전까지)**: ① 결과 카드에 확신도 숫자(예: 88%) 노출? ② v1.0 다크 모드 노출? (값은 이미 4벌 있음, ADR-0017 결정 5)
 - **PCC 전제**: App Store Small Business Program 가입 여부(#103, v1.2)
 - **정리**: Docker Desktop이 멈춰 있었다. 재시작 후 `docker rm -f mw-mysql-redteam; docker rmi caddy:2`(레드팀 잔여물).
@@ -96,6 +98,7 @@ claude --resume 3709399e-b05f-475b-94d3-f593771c009a   # 이 대화 이어가기
 
 ## 7. 다음 할 일 (v1.0, 16번 §0-2)
 
+0. **사용자 작업 E**(§2): iPhone 끊김 측정(`apps/ios-macos/Apps/IOS/E2E/MwonmalPerfTests.swift`, `TEST_RUNNER_MW_PERF=1`) → 결과를 ADR-0025 표에 추가, #123 닫기
 1. **사용자 작업 D**: Apple 키(.p8) → `services/api/.env` → 실로그인(#9 닫기)
 2. **Day 16~17 (infra, #26 #30)**: OCI VM + Compose prod(caddy·mysql·redis) + 배포 스크립트, 앱 `.live` 연결
 3. **Gemini 키 결정**: 운영에서 `MWONMAL_AI_EXTERNAL_TEXT=1` + 키(sops)를 켤지(켜지 않으면 모두 사전 간이 해석)
